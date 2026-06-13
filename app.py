@@ -45,7 +45,7 @@ CATEGORIAS_RECEITA = [
 # ==============================================================================
 if 'banco_dados' not in st.session_state:
     dados_iniciais = [
-        {"Data": "2026-06-01", "Descrição": "Entrada Mensal Base", "Tipo": "Receita", "Valor": 1500.0, "Método": "Ordenado Junior", "Categoria": "Salário/Ordenado", "Status": "Pago"},
+        {"Data": "2026-06-01", "Descrição": "Ordenado Junior", "Tipo": "Receita", "Valor": 1500.0, "Método": "Ordenado Junior", "Categoria": "Salário/Ordenado", "Status": "Pago"},
     ]
     st.session_state.banco_dados = pd.DataFrame(dados_iniciais)
 
@@ -61,27 +61,30 @@ def validar_cartao(descricao, valor, metodo):
     return True
 
 # ==============================================================================
-# ➕ INTERFACE: BARRA LATERAL (Data adaptada para Vencimento/Entrada)
+# ➕ INTERFACE: BARRA LATERAL (Sem o campo de Descrição)
 # ==============================================================================
 st.sidebar.header("➕ Novo Lançamento")
 
 nova_data = st.sidebar.date_input("Data de Vencimento / Entrada", datetime.now())
-nova_desc = st.sidebar.text_input("Descrição da Conta / Origem")
 novo_tipo = st.sidebar.selectbox("Tipo de Fluxo", ["Despesa", "Receita"])
 
 if novo_tipo == "Receita":
     novo_metodo = st.sidebar.selectbox("Forma de Receita", RECEITAS_PERMITIDAS)
     nova_cat = st.sidebar.selectbox("Categoria da Receita", CATEGORIAS_RECEITA)
+    # A própria forma de receita passa a ser a descrição interna
+    nova_desc = novo_metodo 
 else:
     novo_metodo = st.sidebar.selectbox("Forma de Pagamento", METODOS_PAGAMENTO)
     nova_cat = st.sidebar.selectbox("Categoria da Despesa", CATEGORIAS_DESPESA)
+    # Para despesas, usamos a categoria/método como base descritiva automática
+    nova_desc = f"{nova_cat.split(' (')[0]} via {novo_metodo}"
     
 novo_valor = st.sidebar.number_input("Valor (€)", min_value=0.0, step=5.0)
 novas_parcelas = st.sidebar.number_input("Quantidade de Parcelas", min_value=1, max_value=12, value=1)
 
 if st.sidebar.button("Salvar na Planilha"):
-    if not nova_desc or novo_valor <= 0:
-        st.sidebar.warning("⚠️ Preencha a descrição e o valor antes de salvar!")
+    if novo_valor <= 0:
+        st.sidebar.warning("⚠️ Insira um valor maior que 0€ antes de salvar!")
     elif novo_tipo == "Despesa" and not validar_cartao(nova_desc, novo_valor, novo_metodo):
         st.sidebar.error("❌ BLOQUEADO: O 'Cartão Auchan Meire' não permite gastos acima de 50€ fora do grupo Auchan/Gasóleo!")
     else:
@@ -114,7 +117,7 @@ st.session_state.banco_dados['Ano_Mes'] = pd.to_datetime(st.session_state.banco_
 aba_mensal, aba_anual = st.tabs(["📅 Controle Mensal", "📊 Resumos Gerais (Anual e Parcelas)"])
 
 # ------------------------------------------------------------------------------
-# ABA 1: CONTROLE MENSAL (Totalmente Separada)
+# ABA 1: CONTROLE MENSAL (Organização Horizontal Completa)
 # ------------------------------------------------------------------------------
 with aba_mensal:
     meses_disponiveis = sorted(st.session_state.banco_dados['Ano_Mes'].unique())
@@ -132,7 +135,7 @@ with aba_mensal:
     saldo_dinheiro_carteira = receitas_que_geram_dinheiro - despesas_pagas_em_dinheiro
     
     ganhou = df_mes[df_mes['Tipo'] == 'Receita']['Valor'].sum()
-    gastou = df_mes[df_mes['Tipo'] == 'Despay']['Valor'].sum() if 'Despay' in df_mes.columns else df_mes[df_mes['Tipo'] == 'Despesa']['Valor'].sum()
+    gastou = df_mes[df_mes['Tipo'] == 'Despesa']['Valor'].sum()  # Correção efetuada aqui
     a_pagar = df_mes[(df_mes['Tipo'] == 'Despesa') & (df_mes['Status'] == 'Pendente')]['Valor'].sum()
     
     col1, col2, col3, col4 = st.columns(4)
@@ -143,24 +146,20 @@ with aba_mensal:
     
     st.markdown("---")
     
-    # SEPARAÇÃO EXPLICITA DE RECEITAS E DESPESAS EM DUAS COLUNAS VISUAIS
-    col_receitas, col_despesas = st.columns(2)
-    
-    with col_receitas:
-        st.subheader("🍏 Receitas / Entradas")
-        df_rec_mes = df_mes[df_mes['Tipo'] == 'Receita']
-        if not df_rec_mes.empty:
-            for idx, row in df_rec_mes.iterrows():
-                # Formatando a data de exibição para o utilizador saber o dia exato da entrada
-                dia_entrada = datetime.strptime(row['Data'], "%Y-%m-%d").strftime("%d/%m")
+    # BLOCO HORIZONTAL 1: RECEITAS
+    st.subheader("🍏 Receitas / Entradas")
+    df_rec_mes = df_mes[df_mes['Tipo'] == 'Receita']
+    if not df_rec_mes.empty:
+        for idx, row in df_rec_mes.iterrows():
+            dia_entrada = datetime.strptime(row['Data'], "%Y-%m-%d").strftime("%d/%m")
+            
+            with st.container(border=True):
+                c1, c2, c3, c4 = st.columns([3, 2, 2, 2])
+                c1.write(f"**{row['Descrição']}**\n*{row['Categoria']}*")
+                c2.write(f"Valor: **{row['Valor']:.2f}€**")
+                c3.write(f"📅 Entrada: {dia_entrada}\n💳 {row['Método']}")
                 
-                with st.container(border=True):
-                    c1, c2, c3 = st.columns([2, 1, 1])
-                    c1.write(f"**{row['Descrição']}**\n*{row['Categoria']}*")
-                    c2.write(f"Val: **{row['Valor']:.2f}€**\n📅 Ent: {dia_entrada}")
-                    c3.write(f"💳 {row['Método']}")
-                    
-                    # Botões de ação rápidos para receita
+                with c4:
                     cc1, cc2 = st.columns(2)
                     if row['Status'] == 'Pendente':
                         if cc1.button("Receber ✅", key=f"pago_{idx}"):
@@ -171,24 +170,25 @@ with aba_mensal:
                     if cc2.button("Apagar ❌", key=f"del_{idx}"):
                         st.session_state.banco_dados = st.session_state.banco_dados.drop(idx)
                         st.rerun()
-        else:
-            st.info("Nenhuma receita registada neste mês.")
+    else:
+        st.info("Nenhuma receita registada neste mês.")
+        
+    st.markdown("---")
+    
+    # BLOCO HORIZONTAL 2: DESPESAS
+    st.subheader("🛑 Despesas / Contas a Pagar")
+    df_des_mes = df_mes[df_mes['Tipo'] == 'Despesa']
+    if not df_des_mes.empty:
+        for idx, row in df_des_mes.iterrows():
+            dia_vencimento = datetime.strptime(row['Data'], "%Y-%m-%d").strftime("%d/%m")
             
-    with col_despesas:
-        st.subheader("🛑 Despesas / Contas a Pagar")
-        df_des_mes = df_mes[df_mes['Tipo'] == 'Despesa']
-        if not df_des_mes.empty:
-            for idx, row in df_des_mes.iterrows():
-                # Formatando a data de exibição para o utilizador saber o dia exato do vencimento
-                dia_vencimento = datetime.strptime(row['Data'], "%Y-%m-%d").strftime("%d/%m")
+            with st.container(border=True):
+                c1, c2, c3, c4 = st.columns([3, 2, 2, 2])
+                c1.write(f"**{row['Descrição']}**\n*{row['Categoria']}*")
+                c2.write(f"Valor: **{row['Valor']:.2f}€**")
+                c3.write(f"📅 Vencimento: {dia_vencimento}\n💳 {row['Método']}")
                 
-                with st.container(border=True):
-                    c1, c2, c3 = st.columns([2, 1, 1])
-                    c1.write(f"**{row['Descrição']}**\n*{row['Categoria']}*")
-                    c2.write(f"Val: **{row['Valor']:.2f}€**\n📅 Venc: {dia_vencimento}")
-                    c3.write(f"💳 {row['Método']}")
-                    
-                    # Botões de ação rápidos para despesa
+                with c4:
                     cc1, cc2 = st.columns(2)
                     if row['Status'] == 'Pendente':
                         if cc1.button("Dar Baixa ✅", key=f"pago_{idx}"):
