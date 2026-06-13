@@ -49,11 +49,15 @@ if 'banco_dados' not in st.session_state:
     st.session_state.primeiro_acesso = True
 
 # ==============================================================================
-# 🧠 REGRAS DE NEGÓCIO (Nova Trava de Teto Acumulado do Cartão Auchan Meire)
+# 🧠 REGRAS DE NEGÓCIO (Trava Exata do Cartão Auchan Meire)
 # ==============================================================================
-def validar_teto_cartao_auchan(novo_valor, categoria, subdespesa, mes_alvo):
-    # Filtrar os gastos que já existem na planilha para o Cartão Auchan Meire no mês escolhido
+def validar_teto_cartao_auchan(novo_valor, subdespesa, mes_alvo):
     df = st.session_state.banco_dados
+    
+    # 1. Verificar se o texto digitado é exatamente uma das duas opções oficiais
+    texto_formatado = str(subdespesa).strip().lower()
+    eh_auchan_oficial = (texto_formatado == "supermercado auchan") or (texto_formatado == "gasolineira auchan")
+    
     if df.empty:
         gastos_atuais_fora = 0.0
         gastos_atuais_total = 0.0
@@ -65,27 +69,22 @@ def validar_teto_cartao_auchan(novo_valor, categoria, subdespesa, mes_alvo):
             gastos_atuais_fora = 0.0
             gastos_atuais_total = 0.0
         else:
-            # Identifica o que foi gasto fora do grupo Auchan
+            # Para o histórico, verifica quem NÃO escreveu o texto exato
             gastos_fora = df_cartao_mes[
-                ~df_cartao_mes['Categoria'].str.contains("Transportes") & 
-                ~df_cartao_mes['Descrição'].str.lower().str.contains("auchan")
+                ~(df_cartao_mes['Descrição'].str.lower().str.contains("supermercado auchan")) & 
+                ~(df_cartao_mes['Descrição'].str.lower().str.contains("gasolineira auchan"))
             ]
             gastos_atuais_fora = gastos_fora['Valor'].sum()
             gastos_atuais_total = df_cartao_mes['Valor'].sum()
 
-    # Verifica se a nova despesa pertence ou não ao Grupo Auchan
-    eh_gasoleo_ou_carro = "Transportes" in str(categoria)
-    contem_nome_auchan = "auchan" in str(subdespesa).lower()
-    eh_grupo_auchan = eh_gasoleo_ou_carro or contem_nome_auchan
-
-    # 1. Validação do Limite Total do Cartão (165€)
+    # A. Bloqueio Geral do Limite Total do Cartão (165€)
     if gastos_atuais_total + novo_valor > 165.0:
-        return False, f"❌ BLOQUEADO: Este lançamento ultrapassa o limite total mensal do cartão de 165,00€! (Já gasto no mês: {gastos_atuais_total:.2f}€)"
+        return False, f"❌ BLOQUEADO: Este lançamento ultrapassa o limite total de 165,00€ do cartão! (Gasto atual: {gastos_atuais_total:.2f}€)"
 
-    # 2. Validação do Teto Extra-Auchan (50€)
-    if not eh_grupo_auchan:
+    # B. Bloqueio por falta de identificação do local oficial
+    if not eh_auchan_oficial:
         if gastos_atuais_fora + novo_valor > 50.0:
-            return False, f"❌ BLOQUEADO: Limite de 50,00€ para gastos fora do grupo Auchan/Gasolineira foi excedido! (Já gasto fora: {gastos_atuais_fora:.2f}€)"
+            return False, f"❌ BLOQUEADO: Limite de 50,00€ excedido para gastos comuns! Para liberar valores maiores, escreva exatamente 'Supermercado Auchan' ou 'Gasolineira Auchan'. (Gasto fora atual: {gastos_atuais_fora:.2f}€)"
 
     return True, ""
 
@@ -107,7 +106,7 @@ else:
     novo_metodo = st.sidebar.selectbox("Forma de Pagamento", METODOS_PAGAMENTO, key="sb_metodo_des")
     nova_cat = st.sidebar.selectbox("Categoria da Despesa", CATEGORIAS_DESPESA, key="sb_cat_des")
     
-    sub_despesa = st.sidebar.text_input("O que é esta despesa? (Ex: Aluguer, Luz, Pingo Doce)", key="sb_sub_desc")
+    sub_despesa = st.sidebar.text_input("O que é esta despesa? (Ex: Supermercado Auchan, Gasolineira Auchan, Aluguer)", key="sb_sub_desc")
     
     nome_cat_limpo = nova_cat.split('/')[0].split(' (')[0]
     detalhe = f" - {sub_despesa}" if sub_despesa else ""
@@ -124,11 +123,10 @@ if st.sidebar.button("Salvar na Planilha", key="btn_salvar_principal"):
     elif novo_tipo == "Despesa" and not sub_despesa:
         st.sidebar.warning("⚠️ Por favor, preencha o campo informando o que é a despesa!")
     else:
-        # Executa a nova validação acumulada se for o Cartão Auchan Meire
         valido = True
         msg_erro = ""
         if novo_tipo == "Despesa" and str(novo_metodo).strip() == "Cartão Auchan Meire":
-            valido, msg_erro = validar_teto_cartao_auchan(novo_valor, nova_cat, sub_despesa, mes_alvo_cadastro)
+            valido, msg_erro = validar_teto_cartao_auchan(novo_valor, sub_despesa, mes_alvo_cadastro)
             
         if not valido:
             st.sidebar.error(msg_erro)
@@ -197,7 +195,7 @@ if not df_mes.empty:
 else:
     saldo_dinheiro_carteira = 0.0
 
-# Layout Visual por Linhas
+# Layout Visual
 st.markdown("#### 📊 Balanço Geral do Mês")
 top_col1, top_col2 = st.columns(2)
 top_col1.metric("🍏 Ganhei no Mês", f"{ganhou:.2f}€")
