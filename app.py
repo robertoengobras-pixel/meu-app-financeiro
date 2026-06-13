@@ -63,7 +63,6 @@ if 'banco_dados' not in st.session_state:
 
 try:
     conn = st.connection("gsheets", connection_class=GSheetsConnection)
-    # Lê a planilha diretamente pelo URL, ignorando o painel de Secrets
     df_sheets = conn.read(spreadsheet=URL_PLANILHA, ttl="0d")
     
     if df_sheets.empty or df_sheets.columns.size < 3 or "Data" not in df_sheets.columns:
@@ -172,6 +171,7 @@ if st.sidebar.button("Salvar na Planilha", key="btn_salvar_principal"):
             df_novos = pd.DataFrame(novos_dados)
             st.session_state.banco_dados = pd.concat([st.session_state.banco_dados, df_novos], ignore_index=True)
             
+            # CORREÇÃO CRÍTICA AQUI: Adicionado obrigatoriamente o argumento 'spreadsheet'
             try:
                 conn.update(spreadsheet=URL_PLANILHA, data=st.session_state.banco_dados)
                 st.sidebar.success("✅ Guardado com sucesso!")
@@ -244,4 +244,97 @@ bot_col1, bot_col2, bot_col3, bot_col4 = st.columns(4)
 bot_col1.metric("🍱 VR Meire", f"{saldo_vr_meire:.2f}€")
 bot_col2.metric("🍱 VR Junior", f"{saldo_vr_junior:.2f}€")
 bot_col3.metric("🛒 Auchan Meire", f"{saldo_auchan_meire:.2f}€")
-bot_col4.metric("🛒 Auchan Junior", f"{
+bot_col4.metric("🛒 Auchan Junior", f"{saldo_auchan_junior:.2f}€")
+
+st.markdown("---")
+
+aba_mensal, aba_anual = st.tabs(["📅 Controle Mensal", "📊 Resumos Gerais (Anual e Parcelas)"])
+
+with aba_mensal:
+    st.subheader("🍏 Receitas / Entradas")
+    df_rec_mes = df_mes[df_mes['Tipo'] == 'Receita'] if not df_mes.empty else pd.DataFrame()
+    
+    if not df_rec_mes.empty:
+        for idx, row in df_rec_mes.iterrows():
+            try:
+                dia_entrada = pd.to_datetime(row['Data']).strftime("%d/%m")
+            except:
+                dia_entrada = str(row['Data'])
+            with st.container(border=True):
+                c1, c2, c3, c4 = st.columns([3, 2, 2, 2])
+                c1.write(f"**{row['Descrição']}**\n*{row['Categoria']}*")
+                c2.write(f"Valor: **{row['Valor']:.2f}€**")
+                c3.write(f"📅 Entrada: {dia_entrada}\n💳 {row['Método']}")
+                with c4:
+                    cc1, cc2 = st.columns(2)
+                    if row['Status'] == 'Pendente':
+                        if cc1.button("Receber ✅", key=f"pago_rec_{idx}"):
+                            st.session_state.banco_dados.at[idx, 'Status'] = 'Pago'
+                            try:
+                                conn.update(spreadsheet=URL_PLANILHA, data=st.session_state.banco_dados)
+                                st.rerun()
+                            except: pass
+                    else:
+                        cc1.write("🟢 Recebido")
+                    if cc2.button("Apagar ❌", key=f"del_rec_{idx}"):
+                        st.session_state.banco_dados = st.session_state.banco_dados.drop(idx)
+                        try:
+                            conn.update(spreadsheet=URL_PLANILHA, data=st.session_state.banco_dados)
+                            st.rerun()
+                        except: pass
+    else:
+        st.info("Nenhuma receita registada para este mês.")
+        
+    st.markdown("---")
+    
+    st.subheader("🛑 Despesas / Contas a Pagar")
+    df_des_mes = df_mes[df_mes['Tipo'] == 'Despesa'] if not df_mes.empty else pd.DataFrame()
+    
+    if not df_des_mes.empty:
+        for idx, row in df_des_mes.iterrows():
+            try:
+                dia_vencimento = pd.to_datetime(row['Data']).strftime("%d/%m")
+            except:
+                dia_vencimento = str(row['Data'])
+            with st.container(border=True):
+                c1, c2, c3, c4 = st.columns([3, 2, 2, 2])
+                c1.write(f"**{row['Descrição']}**\n*{row['Categoria']}*")
+                c2.write(f"Valor: **{row['Valor']:.2f}€**")
+                c3.write(f"📅 Vencimento: {dia_vencimento}\n💳 {row['Método']}")
+                with c4:
+                    cc1, cc2 = st.columns(2)
+                    if row['Status'] == 'Pendente':
+                        if cc1.button("Dar Baixa ✅", key=f"pago_des_{idx}"):
+                            st.session_state.banco_dados.at[idx, 'Status'] = 'Pago'
+                            try:
+                                conn.update(spreadsheet=URL_PLANILHA, data=st.session_state.banco_dados)
+                                st.rerun()
+                            except: pass
+                    else:
+                        cc1.write("🟢 Pago")
+                    if cc2.button("Apagar ❌", key=f"del_des_{idx}"):
+                        st.session_state.banco_dados = st.session_state.banco_dados.drop(idx)
+                        try:
+                            conn.update(spreadsheet=URL_PLANILHA, data=st.session_state.banco_dados)
+                            st.rerun()
+                        except: pass
+    else:
+        st.info("Nenhuma despesa registada para este mês.")
+        
+    st.markdown("---")
+    st.subheader("📊 Distribuição de Gastos do Mês")
+    if not df_des_mes.empty:
+        fig = px.pie(df_des_mes, values='Valor', names='Categoria', hole=0.4)
+        st.plotly_chart(fig, use_container_width=True)
+
+with aba_anual:
+    st.subheader("📅 Resumo Anual (Fluxo Mês a Mês)")
+    if not st.session_state.banco_dados.empty and 'Ano_Mes' in st.session_state.banco_dados.columns:
+        df_group = st.session_state.banco_dados.dropna(subset=['Ano_Mes', 'Tipo'])
+        if not df_group.empty:
+            resumo_anual = df_group.groupby(['Ano_Mes', 'Tipo'])['Valor'].sum().unstack().fillna(0)
+            if 'Receita' not in resumo_anual.columns: resumo_anual['Receita'] = 0.0
+            if 'Despesa' not in resumo_anual.columns: resumo_anual['Despesa'] = 0.0
+            resumo_anual['Saldo_no_Mês'] = resumo_anual['Receita'] - resumo_anual['Despesa']
+            resumo_anual['Saldo_Acumulado'] = resumo_anual['Saldo_no_Mês'].cumsum()
+            st.dataframe(resumo_anual.style.format("{:.2f}€"), use_container_width=True)
