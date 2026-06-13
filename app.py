@@ -17,13 +17,13 @@ RECEITAS_PERMITIDAS = [
     "Empréstimo Aline", "Empréstimo Gabriel"
 ]
 
-# AJUSTE: Nomes corrigidos conforme solicitado
 METODOS_PAGAMENTO = [
     "Dinheiro", "Cartão Auchan Meire", "Cartão Auchan Junior", 
     "Vale Refeição Junior", "Vale Refeição Meire"
 ]
 
-CATEGORIAS = [
+# Separação das categorias para não misturar Receitas com Despesas
+CATEGORIAS_DESPESA = [
     "Habitação/Casa (Renda, EDP, Água, Internet)",
     "Transportes (Gasóleo, Via Verde, Carro)",
     "Supermercado/Alimentação",
@@ -33,12 +33,20 @@ CATEGORIAS = [
     "Outros/Diversos"
 ]
 
+CATEGORIAS_RECEITA = [
+    "Salário/Ordenado",
+    "Subsídios & Prémios",
+    "Ajudas de Custo / Gasóleo",
+    "Empréstimos Recebidos",
+    "Outras Entradas"
+]
+
 # ==============================================================================
 # 📋 BANCO DE DADOS VIRTUAL
 # ==============================================================================
 if 'banco' not in st.session_state:
     dados_iniciais = [
-        {"Data": "2026-06-01", "Descrição": "Entrada Mensal Base", "Tipo": "Receita", "Valor": 1500.0, "Método": "Ordenado Junior", "Categoria": "Outros/Diversos", "Status": "Pago"},
+        {"Data": "2026-06-01", "Descrição": "Entrada Mensal Base", "Tipo": "Receita", "Valor": 1500.0, "Método": "Ordenado Junior", "Categoria": "Salário/Ordenado", "Status": "Pago"},
     ]
     st.session_state.banco = pd.DataFrame(dados_iniciais)
 
@@ -61,13 +69,14 @@ nova_data = st.sidebar.date_input("Data do Lançamento", datetime.now())
 nova_desc = st.sidebar.text_input("Descrição da Conta / Origem")
 novo_tipo = st.sidebar.selectbox("Tipo de Fluxo", ["Despesa", "Receita"])
 
-# Exibe a lista correta dependendo se é receita ou despesa
+# Correção das Categorias e Métodos dependendo do Tipo selecionado
 if novo_tipo == "Receita":
     novo_metodo = st.sidebar.selectbox("Forma de Receita", RECEITAS_PERMITIDAS)
+    nova_cat = st.sidebar.selectbox("Categoria da Receita", CATEGORIAS_RECEITA)
 else:
     novo_metodo = st.sidebar.selectbox("Forma de Pagamento", METODOS_PAGAMENTO)
+    nova_cat = st.sidebar.selectbox("Categoria da Despesa", CATEGORIAS_DESPESA)
 
-nova_cat = st.sidebar.selectbox("Categoria", CATEGORIAS)
 novo_valor = st.sidebar.number_input("Valor (€)", min_value=0.0, step=5.0)
 novas_parcelas = st.sidebar.number_input("Quantidade de Parcelas", min_value=1, max_value=12, value=1)
 
@@ -98,7 +107,6 @@ if st.sidebar.button("Salvar na Planilha"):
 # ==============================================================================
 # 📊 INTERFACE PRINCIPAL
 # ==============================================================================
-# AJUSTE: Título alterado conforme solicitado
 st.title("💰 Finanças Meire e Junior")
 
 st.session_state.banco['Ano_Mes'] = pd.to_datetime(st.session_state.banco['Data']).dt.strftime('%Y-%m')
@@ -107,22 +115,15 @@ mes_selecionado = st.selectbox("📅 Escolha o Mês para Navegar", meses_disponi
 
 df_mes = st.session_state.banco[st.session_state.banco['Ano_Mes'] == mes_selecionado].copy()
 
-# --- CÁLCULO DA REGRA ESPECIAL DO DINHEIRO DO ROBERTO ---
-# 1. Pegar todas as receitas PAGAS do mês
+# --- CÁLCULO DA REGRA ESPECIAL DO DINHEIRO ---
 df_receitas_pagas = df_mes[(df_mes['Tipo'] == 'Receita') & (df_mes['Status'] == 'Pago')]
-
-# 2. Filtrar excluindo os VRs e os cartões Auchan (Nomes atualizados aqui também)
 receitas_que_geram_dinheiro = df_receitas_pagas[
     ~df_receitas_pagas['Método'].isin(["VR Meire", "VR Junior", "Cartão Auchan Meire", "Cartão Auchan Junior"])
 ]['Valor'].sum()
 
-# 3. Subtrair as despesas que foram pagas efetivamente com o método "Dinheiro"
 despesas_pagas_em_dinheiro = df_mes[(df_mes['Tipo'] == 'Despesa') & (df_mes['Status'] == 'Pago') & (df_mes['Método'] == 'Dinheiro')]['Valor'].sum()
-
-# 4. Saldo Final de Dinheiro Vivo
 saldo_dinheiro_carteira = receitas_que_geram_dinheiro - despesas_pagas_em_dinheiro
 
-# Outros Indicadores
 ganhou = df_mes[df_mes['Tipo'] == 'Receita']['Valor'].sum()
 gastou = df_mes[df_mes['Tipo'] == 'Despesa']['Valor'].sum()
 a_pagar = df_mes[(df_mes['Tipo'] == 'Despesa') & (df_mes['Status'] == 'Pendente')]['Valor'].sum()
@@ -135,23 +136,34 @@ col4.success(f"💵 DINHEIRO NA CARTEIRA: {saldo_dinheiro_carteira:.2f}€")
 
 st.markdown("---")
 
-# LISTA DE MOVIMENTAÇÕES
+# LISTA DE MOVIMENTAÇÕES COM OPÇÕES DE PAGAR E APAGAR
 st.subheader("📋 Lista de Movimentações de " + mes_selecionado)
 if not df_mes.empty:
     for idx, row in df_mes.iterrows():
-        c1, c2, c3, c4, c5 = st.columns([2, 1, 1, 1, 1])
-        c1.write(f"🔹 {row['Descrição']} ({row['Categoria']})")
+        # Layout expandido para acomodar o botão de apagar
+        c1, c2, c3, c4, c5, c6 = st.columns([2.5, 1, 1.2, 1, 1, 0.8])
+        
+        # Cor visual para diferenciar Despesa de Receita na lista
+        prefixo = "🛑" if row['Tipo'] == "Despesa" else "🍏"
+        c1.write(f"{prefixo} {row['Descrição']} *({row['Categoria']})*")
         c2.write(f"**{row['Valor']:.2f}€**")
         c3.write(f"💳 {row['Método']}")
         
+        # Gestão de Status (Pago / Pendente)
         if row['Status'] == 'Pendente':
             c4.write("🔴 *Pendente*")
-            if c5.button("Dar Baixa (Pago)", key=f"btn_{idx}"):
+            if c5.button("Baixa ✅", key=f"pago_{idx}"):
                 st.session_state.banco.at[idx, 'Status'] = 'Pago'
                 st.rerun()
         else:
             c4.write("🟢 **Pago**")
             c5.write("✔️ Concluído")
+            
+        # NOVO: Botão Interativo para Apagar o Lançamento
+        if c6.button("Apagar ❌", key=f"del_{idx}"):
+            st.session_state.banco = st.session_state.banco.drop(idx)
+            st.success("Lançamento removido!")
+            st.rerun()
 else:
     st.info("Nenhum registo para este mês.")
 
