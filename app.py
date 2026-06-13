@@ -53,10 +53,10 @@ CATEGORIAS_RECEITA = [
 ]
 
 # ==============================================================================
-# 📋 CONEXÃO REAL COM O GOOGLE SHEETS (RESOLUÇÃO DO ERRO DE CONEXÃO)
+# 📋 CONEXÃO REAL COM O GOOGLE SHEETS
 # ==============================================================================
 try:
-    # Ajuste do argumento connection_class exigido pela versão do Streamlit
+    # Correção aplicada aqui: alterado de 'type' para 'connection_class'
     conn = st.connection("gsheets", connection_class=GSheetsConnection)
     df_sheets = conn.read(ttl="0d")
     
