@@ -37,6 +37,7 @@ CATEGORIAS_RECEITA = [
     "Subsídios & Prémios",
     "Ajudas de Custo / Gasóleo",
     "Empréstimos Recebidos",
+    "Cartão de Crédito",  # Adicionado conforme solicitado
     "Outras Entradas"
 ]
 
@@ -48,14 +49,16 @@ if 'banco_dados' not in st.session_state:
     st.session_state.primeiro_acesso = True
 
 # ==============================================================================
-# 🧠 REGRAS DE NEGÓCIO
+# 🧠 REGRAS DE NEGÓCIO (Trava de Segurança Corrigida)
 # ==============================================================================
-def validar_cartao(descricao, valor, metodo):
-    if str(metodo).strip().lower() == "cartão auchan meire":
-        desc_lower = str(descricao).lower()
-        contem_auchan = "auchan" in desc_lower or "gasóleo" in desc_lower
-        if not contem_auchan and valor > 50.0:
-            return False
+def validar_cartao_auchan(metodo, valor, categoria, subdespesa):
+    if str(metodo).strip() == "Cartão Auchan Meire":
+        if valor > 50.0:
+            # Só permite se for da categoria Transportes/Gasóleo OU se escreverem "auchan" na especificação
+            eh_gasoleo = "Transportes" in str(categoria)
+            contem_auchan = "auchan" in str(subdespesa).lower()
+            if not (eh_gasoleo or contem_auchan):
+                return False
     return True
 
 # ==============================================================================
@@ -66,6 +69,8 @@ st.sidebar.header("➕ Novo Lançamento")
 nova_data = st.sidebar.date_input("Data de Vencimento / Entrada", datetime.now())
 novo_tipo = st.sidebar.selectbox("Tipo de Fluxo", ["Despesa", "Receita"], key="sb_tipo")
 
+sub_despesa = ""  # Inicialização limpa
+
 if novo_tipo == "Receita":
     novo_metodo = st.sidebar.selectbox("Forma de Receita", RECEITAS_PERMITIDAS, key="sb_metodo_rec")
     nova_cat = st.sidebar.selectbox("Categoria da Receita", CATEGORIAS_RECEITA, key="sb_cat_rec")
@@ -73,7 +78,14 @@ if novo_tipo == "Receita":
 else:
     novo_metodo = st.sidebar.selectbox("Forma de Pagamento", METODOS_PAGAMENTO, key="sb_metodo_des")
     nova_cat = st.sidebar.selectbox("Categoria da Despesa", CATEGORIAS_DESPESA, key="sb_cat_des")
-    nova_desc = f"{nova_cat.split(' (')[0]} ({novo_metodo})"
+    
+    # NOVO CAMPO: Identificar o que é especificamente a despesa (Ex: Aluguel)
+    sub_despesa = st.sidebar.text_input("O que é esta despesa? (Ex: Aluguer, Luz, Pingo Doce)", key="sb_sub_desc")
+    
+    # Constrói a descrição final combinando a Categoria simplificada e o detalhe que escreveste
+    nome_cat_limpo = nova_cat.split('/')[0].split(' (')[0]
+    detalhe = f" - {sub_despesa}" if sub_despesa else ""
+    nova_desc = f"{nome_cat_limpo}{detalhe} ({novo_metodo})"
     
 novo_valor = st.sidebar.number_input("Valor (€)", min_value=0.0, step=5.0, key="sb_valor")
 novas_parcelas = st.sidebar.number_input("Quantidade de Parcelas", min_value=1, max_value=12, value=1, key="sb_parcelas")
@@ -81,8 +93,11 @@ novas_parcelas = st.sidebar.number_input("Quantidade de Parcelas", min_value=1, 
 if st.sidebar.button("Salvar na Planilha", key="btn_salvar_principal"):
     if novo_valor <= 0:
         st.sidebar.warning("⚠️ Insira um valor maior que 0€ antes de salvar!")
-    elif novo_tipo == "Despesa" and not validar_cartao(nova_desc, novo_valor, novo_metodo):
-        st.sidebar.error("❌ BLOQUEADO: O 'Cartão Auchan Meire' não permite gastos acima de 50€ fora do grupo Auchan/Gasóleo!")
+    elif novo_tipo == "Despesa" and not sub_despesa:
+        st.sidebar.warning("⚠️ Por favor, preencha o campo informando o que é a despesa!")
+    # Executa a validação corrigida e robusta do cartão Auchan
+    elif novo_tipo == "Despesa" and not validar_cartao_auchan(novo_metodo, novo_valor, nova_cat, sub_despesa):
+        st.sidebar.error("❌ BLOQUEADO: O 'Cartão Auchan Meire' não permite gastos acima de 50€ fora do grupo Auchan ou Gasóleo!")
     else:
         novos_dados = []
         data_atual = nova_data
@@ -148,23 +163,17 @@ if not df_mes.empty:
 else:
     saldo_dinheiro_carteira = 0.0
 
-# ==============================================================================
-# 🎯 NOVA ORGANIZAÇÃO DOS BLOCOS DE INDICADORES (Hiearquia Visual)
-# ==============================================================================
-
-# LINHA 1: Somente os dois grandes focos do mês
+# Hierarchy Grid Layout
 st.markdown("#### 📊 Balanço Geral do Mês")
 top_col1, top_col2 = st.columns(2)
 top_col1.metric("🍏 Ganhei no Mês", f"{ganhou:.2f}€")
 top_col2.metric("❌ Gasto No Mês", f"{gastou:.2f}€")
 
-# LINHA 2: Resumos imediatos de pagamento e dinheiro físico
 st.markdown("##### 🚨 Controle Financeiro Imediato")
 mid_col1, mid_col2 = st.columns(2)
 mid_col1.error(f"A PAGAR AINDA: {a_pagar:.2f}€")
 mid_col2.success(f"💵 DINHEIRO NA CARTEIRA: {saldo_dinheiro_carteira:.2f}€")
 
-# LINHA 3: Saldos dedicados de Cartões e Vales
 st.markdown("##### 💳 Saldos Disponíveis em Cartões / Vales")
 bot_col1, bot_col2, bot_col3, bot_col4 = st.columns(4)
 bot_col1.metric("🍱 VR Meire", f"{saldo_vr_meire:.2f}€")
@@ -265,5 +274,3 @@ with aba_anual:
             Fim_do_Contrato=('Data', 'max')
         ).reset_index()
         st.dataframe(resumo_parcelas, use_container_width=True)
-    else:
-        st.info("Nenhuma conta parcelada ativa no momento.")
