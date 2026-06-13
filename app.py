@@ -102,7 +102,6 @@ def validar_teto_cartao_auchan(novo_valor, subdespesa, mes_alvo):
         return False, f"❌ BLOQUEADO: Este lançamento ultrapassa o limite total de 165,00€ do cartão! (Gasto atual: {gastos_atuais_total:.2f}€)"
 
     if not eh_auchan_oficial:
-        # Correção aqui: mudado de Float para float (minúsculo)
         if gastos_atuais_fora + float(novo_valor) > 50.0:
             return False, f"❌ BLOQUEADO: Limite de 50,00€ excedido para gastos comuns! Para liberar valores maiores, escreva exatamente 'Supermercado Auchan' ou 'Gasolineira Auchan'. (Gasto fora atual: {gastos_atuais_fora:.2f}€)"
 
@@ -169,8 +168,10 @@ if st.sidebar.button("Salvar na Planilha", key="btn_salvar_principal"):
             df_novos = pd.DataFrame(novos_dados)
             st.session_state.banco_dados = pd.concat([st.session_state.banco_dados, df_novos], ignore_index=True)
             
+            # ATUALIZAÇÃO FORÇADA VIA LINK PÚBLICO
             try:
-                conn.update(data=st.session_state.banco_dados)
+                planilha_url = st.secrets["connections"]["gsheets"]["spreadsheet"]
+                conn.update(spreadsheet=planilha_url, data=st.session_state.banco_dados)
                 st.sidebar.success("✅ Guardado com sucesso!")
                 st.rerun()
             except Exception as ex:
@@ -264,7 +265,8 @@ with aba_mensal:
                         if cc1.button("Receber ✅", key=f"pago_rec_{idx}"):
                             st.session_state.banco_dados.at[idx, 'Status'] = 'Pago'
                             try:
-                                conn.update(data=st.session_state.banco_dados)
+                                planilha_url = st.secrets["connections"]["gsheets"]["spreadsheet"]
+                                conn.update(spreadsheet=planilha_url, data=st.session_state.banco_dados)
                                 st.rerun()
                             except: pass
                     else:
@@ -272,7 +274,8 @@ with aba_mensal:
                     if cc2.button("Apagar ❌", key=f"del_rec_{idx}"):
                         st.session_state.banco_dados = st.session_state.banco_dados.drop(idx)
                         try:
-                            conn.update(data=st.session_state.banco_dados)
+                            planilha_url = st.secrets["connections"]["gsheets"]["spreadsheet"]
+                            conn.update(spreadsheet=planilha_url, data=st.session_state.banco_dados)
                             st.rerun()
                         except: pass
     else:
@@ -300,7 +303,8 @@ with aba_mensal:
                         if cc1.button("Dar Baixa ✅", key=f"pago_des_{idx}"):
                             st.session_state.banco_dados.at[idx, 'Status'] = 'Pago'
                             try:
-                                conn.update(data=st.session_state.banco_dados)
+                                planilha_url = st.secrets["connections"]["gsheets"]["spreadsheet"]
+                                conn.update(spreadsheet=planilha_url, data=st.session_state.banco_dados)
                                 st.rerun()
                             except: pass
                     else:
@@ -308,7 +312,8 @@ with aba_mensal:
                     if cc2.button("Apagar ❌", key=f"del_des_{idx}"):
                         st.session_state.banco_dados = st.session_state.banco_dados.drop(idx)
                         try:
-                            conn.update(data=st.session_state.banco_dados)
+                            planilha_url = st.secrets["connections"]["gsheets"]["spreadsheet"]
+                            conn.update(spreadsheet=planilha_url, data=st.session_state.banco_dados)
                             st.rerun()
                         except: pass
     else:
