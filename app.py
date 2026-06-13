@@ -1,39 +1,39 @@
 import streamlit as st
 import pandas as pd
-import gspread
-from google.oauth2.service_account import Credentials
+from streamlit_gsheets import GSheetsConnection
 from datetime import datetime
-from dateutil.relativedelta import relativedelta
-import plotly.express as px
 
-st.set_page_config(layout="wide", page_title="Finanças Meire e Junior")
+st.set_page_config(layout="wide")
 
-# Configuração de Acesso (Usando a conta de serviço que criaste)
-# NOTA: Garante que o ficheiro JSON está no GitHub como 'google_key.json'
-SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
-KEYFILE = "google_key.json" 
+URL = "https://docs.google.com/spreadsheets/d/1dusMDuXQC4a2xiotVm5Gm4vKrc22VcBudsgeupB55OY/edit?gid=0#gid=0"
 
-def get_gsheet_client():
-    creds = Credentials.from_service_account_file(KEYFILE, scopes=SCOPES)
-    return gspread.authorize(creds)
+# Conectar
+conn = st.connection("gsheets", type=GSheetsConnection)
 
 # Carregar dados
 try:
-    client = get_gsheet_client()
-    sheet = client.open_by_url("https://docs.google.com/spreadsheets/d/1dusMDuXQC4a2xiotVm5Gm4vKrc22VcBudsgeupB55OY/edit#gid=0").sheet1
-    data = sheet.get_all_records()
-    df = pd.DataFrame(data)
-    st.session_state.banco_dados = df
-except Exception as e:
-    st.error(f"Erro ao carregar do Sheets: {e}")
-    if 'banco_dados' not in st.session_state:
-        st.session_state.banco_dados = pd.DataFrame(columns=["Data", "Descrição", "Tipo", "Valor", "Método", "Categoria", "Status"])
+    df = conn.read(spreadsheet=URL, ttl=0)
+    st.session_state.df = df
+except:
+    st.session_state.df = pd.DataFrame(columns=["Data", "Descrição", "Tipo", "Valor", "Método", "Categoria", "Status"])
 
-# ... (O resto do código permanece igual, só alteramos a função de salvar abaixo)
+st.title("Finanças Meire e Junior")
 
-def salvar_no_sheets(df):
-    sheet.clear()
-    sheet.update([df.columns.values.tolist()] + df.values.tolist())
+# Simples formulário de teste para ver se salva
+with st.sidebar:
+    st.header("Novo Lançamento")
+    data = st.date_input("Data")
+    desc = st.text_input("Descrição")
+    valor = st.number_input("Valor")
+    if st.button("Salvar"):
+        novo_dado = pd.DataFrame([{"Data": str(data), "Descrição": desc, "Tipo": "Despesa", "Valor": valor, "Método": "Dinheiro", "Categoria": "Outros", "Status": "Pendente"}])
+        df_atualizado = pd.concat([st.session_state.df, novo_dado], ignore_index=True)
+        # Tenta salvar
+        try:
+            conn.update(spreadsheet=URL, data=df_atualizado)
+            st.success("Salvo!")
+            st.rerun()
+        except Exception as e:
+            st.error(f"Erro ao salvar: {e}")
 
-# No teu botão de salvar, em vez de conn.update, usas:
-# salvar_no_sheets(st.session_state.banco_dados)
+st.dataframe(st.session_state.df)
