@@ -41,11 +41,10 @@ CATEGORIAS_RECEITA = [
 ]
 
 # ==============================================================================
-# 📋 BANCO DE DADOS PERSISTENTE (Com flag para evitar reset total)
+# 📋 BANCO DE DADOS PERSISTENTE
 # ==============================================================================
 if 'banco_dados' not in st.session_state:
     st.session_state.banco_dados = pd.DataFrame(columns=["Data", "Descrição", "Tipo", "Valor", "Método", "Categoria", "Status"])
-    # Iniciamos com o banco vazio real, sem travas fantasmas
     st.session_state.primeiro_acesso = True
 
 # ==============================================================================
@@ -60,7 +59,7 @@ def validar_cartao(descricao, valor, metodo):
     return True
 
 # ==============================================================================
-# ➕ INTERFACE: BARRA LATERAL (Blindada contra loops)
+# ➕ INTERFACE: BARRA LATERAL
 # ==============================================================================
 st.sidebar.header("➕ Novo Lançamento")
 
@@ -79,7 +78,6 @@ else:
 novo_valor = st.sidebar.number_input("Valor (€)", min_value=0.0, step=5.0, key="sb_valor")
 novas_parcelas = st.sidebar.number_input("Quantidade de Parcelas", min_value=1, max_value=12, value=1, key="sb_parcelas")
 
-# SISTEMA DE DISPARO INDEPENDENTE: Só roda uma vez ao carregar o clique
 if st.sidebar.button("Salvar na Planilha", key="btn_salvar_principal"):
     if novo_valor <= 0:
         st.sidebar.warning("⚠️ Insira um valor maior que 0€ antes de salvar!")
@@ -101,7 +99,6 @@ if st.sidebar.button("Salvar na Planilha", key="btn_salvar_principal"):
             })
             data_atual += relativedelta(months=1)
         
-        # Junta os dados e limpa o gatilho imediatamente
         df_novos = pd.DataFrame(novos_dados)
         st.session_state.banco_dados = pd.concat([st.session_state.banco_dados, df_novos], ignore_index=True)
         st.session_state.primeiro_acesso = False
@@ -112,7 +109,6 @@ if st.sidebar.button("Salvar na Planilha", key="btn_salvar_principal"):
 # ==============================================================================
 st.title("💰 Finanças Meire e Junior")
 
-# Trata tabela vazia de forma segura
 if not st.session_state.banco_dados.empty:
     st.session_state.banco_dados['Ano_Mes'] = pd.to_datetime(st.session_state.banco_dados['Data']).dt.strftime('%Y-%m')
     meses_disponiveis = sorted(st.session_state.banco_dados['Ano_Mes'].unique())
@@ -122,18 +118,28 @@ else:
 
 mes_selecionado = st.selectbox("📅 Escolha o Mês para Analisar", meses_disponiveis, key="filtro_mes")
 
-# Filtragem segura do mês atual
 if not st.session_state.banco_dados.empty:
     df_mes = st.session_state.banco_dados[st.session_state.banco_dados['Ano_Mes'] == mes_selecionado].copy()
 else:
     df_mes = pd.DataFrame(columns=["Data", "Descrição", "Tipo", "Valor", "Método", "Categoria", "Status", "Ano_Mes"])
 
-# --- CÁLCULOS MATEMÁTICOS DOS CARDS ---
+# --- CÁLCULOS DOS SUCESSOS E DESPESAS ---
 ganhou = df_mes[df_mes['Tipo'] == 'Receita']['Valor'].sum() if not df_mes.empty else 0.0
 gastou = df_mes[df_mes['Tipo'] == 'Despesa']['Valor'].sum() if not df_mes.empty else 0.0
 a_pagar = df_mes[(df_mes['Tipo'] == 'Despesa') & (df_mes['Status'] == 'Pendente')]['Valor'].sum() if not df_mes.empty else 0.0
 
-# Regra Dinheiro Vivo na Carteira
+# --- LÓGICA DE SALDOS INDIVIDUAIS (MÊS ATUAL) ---
+def calcular_saldo_recurso(df, nome_receita, nome_pagamento):
+    rec = df[(df['Tipo'] == 'Receita') & (df['Status'] == 'Pago') & (df['Método'] == nome_receita)]['Valor'].sum()
+    desp = df[(df['Tipo'] == 'Despesa') & (df['Status'] == 'Pago') & (df['Método'] == nome_pagamento)]['Valor'].sum()
+    return rec - desp
+
+saldo_vr_meire = calcular_saldo_recurso(df_mes, "VR Meire", "Vale Refeição Meire")
+saldo_vr_junior = calcular_saldo_recurso(df_mes, "VR Junior", "Vale Refeição Junior")
+saldo_auchan_meire = calcular_saldo_recurso(df_mes, "Cartão Auchan Meire", "Cartão Auchan Meire")
+saldo_auchan_junior = calcular_saldo_recurso(df_mes, "Cartão Auchan Junior", "Cartão Auchan Junior")
+
+# Cálculo Dinheiro Vivo na Carteira
 if not df_mes.empty:
     df_receitas_pagas = df_mes[(df_mes['Tipo'] == 'Receita') & (df_mes['Status'] == 'Pago')]
     receitas_que_geram_dinheiro = df_receitas_pagas[
@@ -144,18 +150,29 @@ if not df_mes.empty:
 else:
     saldo_dinheiro_carteira = 0.0
 
+# LINHA 1 DE METRICAS: Resumo Geral
 col1, col2, col3, col4 = st.columns(4)
 col1.metric("Ganhei no Mês", f"{ganhou:.2f}€")
 col2.metric("Gasto No Mês", f"{gastou:.2f}€")
 col3.error(f"A PAGAR AINDA: {a_pagar:.2f}€")
-col4.success(f"💵 DINHEIRO NA CARTEIRA: {saldo_dinheiro_carteira:.2f}€")
+col4.success(f"💵 DINHEIRO CARTEIRA: {saldo_dinheiro_carteira:.2f}€")
+
+# NOVO: LINHA 2 DE METRICAS: Saldos específicos de Vales e Cartões
+st.markdown("##### 💳 Saldos Disponíveis em Cartões / Vales")
+col_v1, col_v2, col_a1, col_a2 = st.columns(4)
+col_v1.metric("🍱 VR Meire", f"{saldo_vr_meire:.2f}€")
+col_v2.metric("🍱 VR Junior", f"{saldo_vr_junior:.2f}€")
+col_a1.metric("🛒 Auchan Meire", f"{saldo_auchan_meire:.2f}€")
+col_a2.metric("🛒 Auchan Junior", f"{saldo_auchan_junior:.2f}€")
 
 st.markdown("---")
 
+# ==============================================================================
+# ABAS DE CONTROLE
+# ==============================================================================
 aba_mensal, aba_anual = st.tabs(["📅 Controle Mensal", "📊 Resumos Gerais (Anual e Parcelas)"])
 
 with aba_mensal:
-    # HORIZONTAL 1: RECEITAS
     st.subheader("🍏 Receitas / Entradas")
     df_rec_mes = df_mes[df_mes['Tipo'] == 'Receita'] if not df_mes.empty else pd.DataFrame()
     
@@ -183,7 +200,6 @@ with aba_mensal:
         
     st.markdown("---")
     
-    # HORIZONTAL 2: DESPESAS
     st.subheader("🛑 Despesas / Contas a Pagar")
     df_des_mes = df_mes[df_mes['Tipo'] == 'Despesa'] if not df_mes.empty else pd.DataFrame()
     
