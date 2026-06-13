@@ -1,3 +1,13 @@
+import os
+import subprocess
+import sys
+
+# Força a instalação caso o Streamlit Cloud ignore o requirements.txt
+try:
+    import streamlit_gsheets
+except ImportError:
+    subprocess.check_call([sys.executable, "-m", "pip", "install", "streamlit-gsheets"])
+
 import streamlit as st
 import pandas as pd
 from datetime import datetime
@@ -61,7 +71,7 @@ except Exception as e:
         st.session_state.banco_dados = pd.DataFrame(columns=["Data", "Descrição", "Tipo", "Valor", "Método", "Categoria", "Status"])
 
 # ==============================================================================
-# 🧠 REGRAS DE NEGÓCIO (CORRIGIDA: Sem erros de sintaxe na linha 80)
+# 🧠 REGRAS DE NEGÓCIO
 # ==============================================================================
 def validar_teto_cartao_auchan(novo_valor, subdespesa, mes_alvo):
     df = st.session_state.banco_dados
@@ -74,7 +84,6 @@ def validar_teto_cartao_auchan(novo_valor, subdespesa, mes_alvo):
         gastos_atuais_total = 0.0
     else:
         df['Ano_Mes_Tmp'] = pd.to_datetime(df['Data']).dt.strftime('%Y-%m')
-        # CORREÇÃO AQUI: Sintaxe limpa e fechada corretamente
         df_cartao_mes = df[(df['Tipo'] == 'Despesa') & (df['Método'] == 'Cartão Auchan Meire') & (df['Ano_Mes_Tmp'] == mes_alvo)]
         
         if df_cartao_mes.empty:
@@ -171,8 +180,12 @@ if st.sidebar.button("Salvar na Planilha", key="btn_salvar_principal"):
 st.title("💰 Finanças Meire e Junior")
 
 if not st.session_state.banco_dados.empty:
-    st.session_state.banco_dados['Ano_Mes'] = pd.to_datetime(st.session_state.banco_dados['Data']).dt.strftime('%Y-%m')
-    meses_disponiveis = sorted(st.session_state.banco_dados['Ano_Mes'].unique())
+    st.session_state.banco_dados['Year_Month_Check'] = pd.to_datetime(st.session_state.banco_dados['Data'], errors='coerce')
+    st.session_state.banco_dados['Ano_Mes'] = st.session_state.banco_dados['Year_Month_Check'].dt.strftime('%Y-%m')
+    st.session_state.banco_dados = st.session_state.banco_dados.drop(columns=['Year_Month_Check'], errors='ignore')
+    meses_disponiveis = sorted(st.session_state.banco_dados['Ano_Mes'].dropna().unique())
+    if not meses_disponiveis:
+        meses_disponiveis = [datetime.now().strftime('%Y-%m')]
 else:
     st.session_state.banco_dados['Ano_Mes'] = pd.Series(dtype='str')
     meses_disponiveis = [datetime.now().strftime('%Y-%m')]
@@ -240,7 +253,10 @@ with aba_mensal:
     
     if not df_rec_mes.empty:
         for idx, row in df_rec_mes.iterrows():
-            dia_entrada = datetime.strptime(str(row['Data']), "%Y-%m-%d").strftime("%d/%m")
+            try:
+                dia_entrada = datetime.strptime(str(row['Data']), "%Y-%m-%d").strftime("%d/%m")
+            except:
+                dia_entrada = str(row['Data'])
             with st.container(border=True):
                 c1, c2, c3, c4 = st.columns([3, 2, 2, 2])
                 c1.write(f"**{row['Descrição']}**\n*{row['Categoria']}*")
@@ -273,7 +289,10 @@ with aba_mensal:
     
     if not df_des_mes.empty:
         for idx, row in df_des_mes.iterrows():
-            dia_vencimento = datetime.strptime(str(row['Data']), "%Y-%m-%d").strftime("%d/%m")
+            try:
+                dia_vencimento = datetime.strptime(str(row['Data']), "%Y-%m-%d").strftime("%d/%m")
+            except:
+                dia_vencimento = str(row['Data'])
             with st.container(border=True):
                 c1, c2, c3, c4 = st.columns([3, 2, 2, 2])
                 c1.write(f"**{row['Descrição']}**\n*{row['Categoria']}*")
