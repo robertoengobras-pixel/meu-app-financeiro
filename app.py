@@ -61,11 +61,11 @@ def validar_cartao(descricao, valor, metodo):
     return True
 
 # ==============================================================================
-# ➕ INTERFACE: BARRA LATERAL (Captura de dados estável)
+# ➕ INTERFACE: BARRA LATERAL (Data adaptada para Vencimento/Entrada)
 # ==============================================================================
 st.sidebar.header("➕ Novo Lançamento")
 
-nova_data = st.sidebar.date_input("Data do Lançamento", datetime.now())
+nova_data = st.sidebar.date_input("Data de Vencimento / Entrada", datetime.now())
 nova_desc = st.sidebar.text_input("Descrição da Conta / Origem")
 novo_tipo = st.sidebar.selectbox("Tipo de Fluxo", ["Despesa", "Receita"])
 
@@ -79,7 +79,6 @@ else:
 novo_valor = st.sidebar.number_input("Valor (€)", min_value=0.0, step=5.0)
 novas_parcelas = st.sidebar.number_input("Quantidade de Parcelas", min_value=1, max_value=12, value=1)
 
-# LÓGICA DE SALVAMENTO CORRIGIDA: Armazena o clique temporariamente para processar sem perdas
 if st.sidebar.button("Salvar na Planilha"):
     if not nova_desc or novo_valor <= 0:
         st.sidebar.warning("⚠️ Preencha a descrição e o valor antes de salvar!")
@@ -101,7 +100,6 @@ if st.sidebar.button("Salvar na Planilha"):
             })
             data_atual += relativedelta(months=1)
         
-        # Inserção direta e forçada na memória
         st.session_state.banco_dados = pd.concat([st.session_state.banco_dados, pd.DataFrame(novos_dados)], ignore_index=True)
         st.sidebar.success("✅ Adicionado com sucesso!")
         st.rerun()
@@ -111,13 +109,12 @@ if st.sidebar.button("Salvar na Planilha"):
 # ==============================================================================
 st.title("💰 Finanças Meire e Junior")
 
-# Formata as datas para agrupamento mensal correto
 st.session_state.banco_dados['Ano_Mes'] = pd.to_datetime(st.session_state.banco_dados['Data']).dt.strftime('%Y-%m')
 
 aba_mensal, aba_anual = st.tabs(["📅 Controle Mensal", "📊 Resumos Gerais (Anual e Parcelas)"])
 
 # ------------------------------------------------------------------------------
-# ABA 1: CONTROLE MENSAL
+# ABA 1: CONTROLE MENSAL (Totalmente Separada)
 # ------------------------------------------------------------------------------
 with aba_mensal:
     meses_disponiveis = sorted(st.session_state.banco_dados['Ano_Mes'].unique())
@@ -135,7 +132,7 @@ with aba_mensal:
     saldo_dinheiro_carteira = receitas_que_geram_dinheiro - despesas_pagas_em_dinheiro
     
     ganhou = df_mes[df_mes['Tipo'] == 'Receita']['Valor'].sum()
-    gastou = df_mes[df_mes['Tipo'] == 'Despesa']['Valor'].sum()
+    gastou = df_mes[df_mes['Tipo'] == 'Despay']['Valor'].sum() if 'Despay' in df_mes.columns else df_mes[df_mes['Tipo'] == 'Despesa']['Valor'].sum()
     a_pagar = df_mes[(df_mes['Tipo'] == 'Despesa') & (df_mes['Status'] == 'Pendente')]['Valor'].sum()
     
     col1, col2, col3, col4 = st.columns(4)
@@ -146,29 +143,64 @@ with aba_mensal:
     
     st.markdown("---")
     
-    st.subheader("📋 Lista de Movimentações")
-    if not df_mes.empty:
-        for idx, row in df_mes.iterrows():
-            c1, c2, c3, c4, c5, c6 = st.columns([2.5, 1, 1.2, 1, 1, 0.8])
-            prefixo = "🛑" if row['Tipo'] == "Despesa" else "🍏"
-            c1.write(f"{prefixo} {row['Descrição']} *({row['Categoria']})*")
-            c2.write(f"**{row['Valor']:.2f}€**")
-            c3.write(f"💳 {row['Método']}")
-            
-            if row['Status'] == 'Pendente':
-                c4.write("🔴 *Pendente*")
-                if c5.button("Baixa ✅", key=f"pago_{idx}"):
-                    st.session_state.banco_dados.at[idx, 'Status'] = 'Pago'
-                    st.rerun()
-            else:
-                c4.write("🟢 **Pago**")
-                c5.write("✔️ Concluído")
+    # SEPARAÇÃO EXPLICITA DE RECEITAS E DESPESAS EM DUAS COLUNAS VISUAIS
+    col_receitas, col_despesas = st.columns(2)
+    
+    with col_receitas:
+        st.subheader("🍏 Receitas / Entradas")
+        df_rec_mes = df_mes[df_mes['Tipo'] == 'Receita']
+        if not df_rec_mes.empty:
+            for idx, row in df_rec_mes.iterrows():
+                # Formatando a data de exibição para o utilizador saber o dia exato da entrada
+                dia_entrada = datetime.strptime(row['Data'], "%Y-%m-%d").strftime("%d/%m")
                 
-            if c6.button("Apagar ❌", key=f"del_{idx}"):
-                st.session_state.banco_dados = st.session_state.banco_dados.drop(idx)
-                st.rerun()
-    else:
-        st.info("Nenhum registo para este mês.")
+                with st.container(border=True):
+                    c1, c2, c3 = st.columns([2, 1, 1])
+                    c1.write(f"**{row['Descrição']}**\n*{row['Categoria']}*")
+                    c2.write(f"Val: **{row['Valor']:.2f}€**\n📅 Ent: {dia_entrada}")
+                    c3.write(f"💳 {row['Método']}")
+                    
+                    # Botões de ação rápidos para receita
+                    cc1, cc2 = st.columns(2)
+                    if row['Status'] == 'Pendente':
+                        if cc1.button("Receber ✅", key=f"pago_{idx}"):
+                            st.session_state.banco_dados.at[idx, 'Status'] = 'Pago'
+                            st.rerun()
+                    else:
+                        cc1.write("🟢 Recebido")
+                    if cc2.button("Apagar ❌", key=f"del_{idx}"):
+                        st.session_state.banco_dados = st.session_state.banco_dados.drop(idx)
+                        st.rerun()
+        else:
+            st.info("Nenhuma receita registada neste mês.")
+            
+    with col_despesas:
+        st.subheader("🛑 Despesas / Contas a Pagar")
+        df_des_mes = df_mes[df_mes['Tipo'] == 'Despesa']
+        if not df_des_mes.empty:
+            for idx, row in df_des_mes.iterrows():
+                # Formatando a data de exibição para o utilizador saber o dia exato do vencimento
+                dia_vencimento = datetime.strptime(row['Data'], "%Y-%m-%d").strftime("%d/%m")
+                
+                with st.container(border=True):
+                    c1, c2, c3 = st.columns([2, 1, 1])
+                    c1.write(f"**{row['Descrição']}**\n*{row['Categoria']}*")
+                    c2.write(f"Val: **{row['Valor']:.2f}€**\n📅 Venc: {dia_vencimento}")
+                    c3.write(f"💳 {row['Método']}")
+                    
+                    # Botões de ação rápidos para despesa
+                    cc1, cc2 = st.columns(2)
+                    if row['Status'] == 'Pendente':
+                        if cc1.button("Dar Baixa ✅", key=f"pago_{idx}"):
+                            st.session_state.banco_dados.at[idx, 'Status'] = 'Pago'
+                            st.rerun()
+                    else:
+                        cc1.write("🟢 Pago")
+                    if cc2.button("Apagar ❌", key=f"del_{idx}"):
+                        st.session_state.banco_dados = st.session_state.banco_dados.drop(idx)
+                        st.rerun()
+        else:
+            st.info("Nenhuma despesa registada neste mês.")
         
     st.markdown("---")
     st.subheader("📊 Distribuição de Gastos do Mês")
@@ -176,8 +208,6 @@ with aba_mensal:
     if not df_gastos_mes.empty:
         fig = px.pie(df_gastos_mes, values='Valor', names='Categoria', hole=0.4)
         st.plotly_chart(fig, use_container_width=True)
-    else:
-        st.info("Nenhuma despesa registada neste mês.")
 
 # ------------------------------------------------------------------------------
 # ABA 2: RESUMOS ANUAIS E CONTRATOS PARCELADOS
