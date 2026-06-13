@@ -5,7 +5,7 @@ from dateutil.relativedelta import relativedelta
 import plotly.express as px
 
 # Configuração da página para o modo estendido (visual moderno)
-st.set_page_config(layout="wide", page_title="Gestão Financeira Familiar")
+st.set_page_config(layout="wide", page_title="Finanças Meire e Junior")
 
 # ==============================================================================
 # 📋 LISTAS OFICIAIS CONFIGURADAS PELO ROBERTO
@@ -17,9 +17,10 @@ RECEITAS_PERMITIDAS = [
     "Empréstimo Aline", "Empréstimo Gabriel"
 ]
 
+# AJUSTE: Nomes corrigidos conforme solicitado
 METODOS_PAGAMENTO = [
-    "Dinheiro", "Cartão de Crédito Meu", "Cartão Auchan Meire", 
-    "Cartão Auchan Junior", "Vale Refeição Meu", "Vale Refeição da Esposa"
+    "Dinheiro", "Cartão Auchan Meire", "Cartão Auchan Junior", 
+    "Vale Refeição Junior", "Vale Refeição Meire"
 ]
 
 CATEGORIAS = [
@@ -97,7 +98,8 @@ if st.sidebar.button("Salvar na Planilha"):
 # ==============================================================================
 # 📊 INTERFACE PRINCIPAL
 # ==============================================================================
-st.title("💰 O Nosso Aplicativo de Finanças Familiar")
+# AJUSTE: Título alterado conforme solicitado
+st.title("💰 Finanças Meire e Junior")
 
 st.session_state.banco['Ano_Mes'] = pd.to_datetime(st.session_state.banco['Data']).dt.strftime('%Y-%m')
 meses_disponiveis = sorted(st.session_state.banco['Ano_Mes'].unique())
@@ -108,7 +110,8 @@ df_mes = st.session_state.banco[st.session_state.banco['Ano_Mes'] == mes_selecio
 # --- CÁLCULO DA REGRA ESPECIAL DO DINHEIRO DO ROBERTO ---
 # 1. Pegar todas as receitas PAGAS do mês
 df_receitas_pagas = df_mes[(df_mes['Tipo'] == 'Receita') & (df_mes['Status'] == 'Pago')]
-# 2. Filtrar excluindo os VRs e os cartões Auchan conforme a regra
+
+# 2. Filtrar excluindo os VRs e os cartões Auchan (Nomes atualizados aqui também)
 receitas_que_geram_dinheiro = df_receitas_pagas[
     ~df_receitas_pagas['Método'].isin(["VR Meire", "VR Junior", "Cartão Auchan Meire", "Cartão Auchan Junior"])
 ]['Valor'].sum()
@@ -126,7 +129,7 @@ a_pagar = df_mes[(df_mes['Tipo'] == 'Despesa') & (df_mes['Status'] == 'Pendente'
 
 col1, col2, col3, col4 = st.columns(4)
 col1.metric("Ganhei no Mês Inteiro", f"{ganhou:.2f}€")
-col2.metric("Gastei no Mês Inteiro", f"{gastou:.2f}€")
+col2.metric("Gasto No Mês Inteiro", f"{gastou:.2f}€")
 col3.error(f"A PAGAR AINDA: {a_pagar:.2f}€")
 col4.success(f"💵 DINHEIRO NA CARTEIRA: {saldo_dinheiro_carteira:.2f}€")
 
