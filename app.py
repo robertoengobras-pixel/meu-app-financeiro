@@ -123,12 +123,11 @@ if not st.session_state.banco_dados.empty:
 else:
     df_mes = pd.DataFrame(columns=["Data", "Descrição", "Tipo", "Valor", "Método", "Categoria", "Status", "Ano_Mes"])
 
-# --- CÁLCULOS DOS SUCESSOS E DESPESAS ---
+# --- CÁLCULOS MATEMÁTICOS ---
 ganhou = df_mes[df_mes['Tipo'] == 'Receita']['Valor'].sum() if not df_mes.empty else 0.0
 gastou = df_mes[df_mes['Tipo'] == 'Despesa']['Valor'].sum() if not df_mes.empty else 0.0
 a_pagar = df_mes[(df_mes['Tipo'] == 'Despesa') & (df_mes['Status'] == 'Pendente')]['Valor'].sum() if not df_mes.empty else 0.0
 
-# --- LÓGICA DE SALDOS INDIVIDUAIS (MÊS ATUAL) ---
 def calcular_saldo_recurso(df, nome_receita, nome_pagamento):
     rec = df[(df['Tipo'] == 'Receita') & (df['Status'] == 'Pago') & (df['Método'] == nome_receita)]['Valor'].sum()
     desp = df[(df['Tipo'] == 'Despesa') & (df['Status'] == 'Pago') & (df['Método'] == nome_pagamento)]['Valor'].sum()
@@ -139,7 +138,6 @@ saldo_vr_junior = calcular_saldo_recurso(df_mes, "VR Junior", "Vale Refeição J
 saldo_auchan_meire = calcular_saldo_recurso(df_mes, "Cartão Auchan Meire", "Cartão Auchan Meire")
 saldo_auchan_junior = calcular_saldo_recurso(df_mes, "Cartão Auchan Junior", "Cartão Auchan Junior")
 
-# Cálculo Dinheiro Vivo na Carteira
 if not df_mes.empty:
     df_receitas_pagas = df_mes[(df_mes['Tipo'] == 'Receita') & (df_mes['Status'] == 'Pago')]
     receitas_que_geram_dinheiro = df_receitas_pagas[
@@ -150,20 +148,29 @@ if not df_mes.empty:
 else:
     saldo_dinheiro_carteira = 0.0
 
-# LINHA 1 DE METRICAS: Resumo Geral
-col1, col2, col3, col4 = st.columns(4)
-col1.metric("Ganhei no Mês", f"{ganhou:.2f}€")
-col2.metric("Gasto No Mês", f"{gastou:.2f}€")
-col3.error(f"A PAGAR AINDA: {a_pagar:.2f}€")
-col4.success(f"💵 DINHEIRO CARTEIRA: {saldo_dinheiro_carteira:.2f}€")
+# ==============================================================================
+# 🎯 NOVA ORGANIZAÇÃO DOS BLOCOS DE INDICADORES (Hiearquia Visual)
+# ==============================================================================
 
-# NOVO: LINHA 2 DE METRICAS: Saldos específicos de Vales e Cartões
+# LINHA 1: Somente os dois grandes focos do mês
+st.markdown("#### 📊 Balanço Geral do Mês")
+top_col1, top_col2 = st.columns(2)
+top_col1.metric("🍏 Ganhei no Mês", f"{ganhou:.2f}€")
+top_col2.metric("❌ Gasto No Mês", f"{gastou:.2f}€")
+
+# LINHA 2: Resumos imediatos de pagamento e dinheiro físico
+st.markdown("##### 🚨 Controle Financeiro Imediato")
+mid_col1, mid_col2 = st.columns(2)
+mid_col1.error(f"A PAGAR AINDA: {a_pagar:.2f}€")
+mid_col2.success(f"💵 DINHEIRO NA CARTEIRA: {saldo_dinheiro_carteira:.2f}€")
+
+# LINHA 3: Saldos dedicados de Cartões e Vales
 st.markdown("##### 💳 Saldos Disponíveis em Cartões / Vales")
-col_v1, col_v2, col_a1, col_a2 = st.columns(4)
-col_v1.metric("🍱 VR Meire", f"{saldo_vr_meire:.2f}€")
-col_v2.metric("🍱 VR Junior", f"{saldo_vr_junior:.2f}€")
-col_a1.metric("🛒 Auchan Meire", f"{saldo_auchan_meire:.2f}€")
-col_a2.metric("🛒 Auchan Junior", f"{saldo_auchan_junior:.2f}€")
+bot_col1, bot_col2, bot_col3, bot_col4 = st.columns(4)
+bot_col1.metric("🍱 VR Meire", f"{saldo_vr_meire:.2f}€")
+bot_col2.metric("🍱 VR Junior", f"{saldo_vr_junior:.2f}€")
+bot_col3.metric("🛒 Auchan Meire", f"{saldo_auchan_meire:.2f}€")
+bot_col4.metric("🛒 Auchan Junior", f"{saldo_auchan_junior:.2f}€")
 
 st.markdown("---")
 
