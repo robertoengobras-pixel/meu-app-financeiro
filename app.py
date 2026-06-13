@@ -41,13 +41,12 @@ CATEGORIAS_RECEITA = [
 ]
 
 # ==============================================================================
-# 📋 BANCO DE DADOS PERSISTENTE
+# 📋 BANCO DE DADOS PERSISTENTE (Com flag para evitar reset total)
 # ==============================================================================
 if 'banco_dados' not in st.session_state:
-    dados_iniciais = [
-        {"Data": "2026-06-01", "Descrição": "Ordenado Junior", "Tipo": "Receita", "Valor": 1500.0, "Método": "Ordenado Junior", "Categoria": "Salário/Ordenado", "Status": "Pago"},
-    ]
-    st.session_state.banco_dados = pd.DataFrame(dados_iniciais)
+    st.session_state.banco_dados = pd.DataFrame(columns=["Data", "Descrição", "Tipo", "Valor", "Método", "Categoria", "Status"])
+    # Iniciamos com o banco vazio real, sem travas fantasmas
+    st.session_state.primeiro_acesso = True
 
 # ==============================================================================
 # 🧠 REGRAS DE NEGÓCIO
@@ -61,28 +60,27 @@ def validar_cartao(descricao, valor, metodo):
     return True
 
 # ==============================================================================
-# ➕ INTERFACE: BARRA LATERAL (Sem o campo de Descrição)
+# ➕ INTERFACE: BARRA LATERAL (Blindada contra loops)
 # ==============================================================================
 st.sidebar.header("➕ Novo Lançamento")
 
 nova_data = st.sidebar.date_input("Data de Vencimento / Entrada", datetime.now())
-novo_tipo = st.sidebar.selectbox("Tipo de Fluxo", ["Despesa", "Receita"])
+novo_tipo = st.sidebar.selectbox("Tipo de Fluxo", ["Despesa", "Receita"], key="sb_tipo")
 
 if novo_tipo == "Receita":
-    novo_metodo = st.sidebar.selectbox("Forma de Receita", RECEITAS_PERMITIDAS)
-    nova_cat = st.sidebar.selectbox("Categoria da Receita", CATEGORIAS_RECEITA)
-    # A própria forma de receita passa a ser a descrição interna
+    novo_metodo = st.sidebar.selectbox("Forma de Receita", RECEITAS_PERMITIDAS, key="sb_metodo_rec")
+    nova_cat = st.sidebar.selectbox("Categoria da Receita", CATEGORIAS_RECEITA, key="sb_cat_rec")
     nova_desc = novo_metodo 
 else:
-    novo_metodo = st.sidebar.selectbox("Forma de Pagamento", METODOS_PAGAMENTO)
-    nova_cat = st.sidebar.selectbox("Categoria da Despesa", CATEGORIAS_DESPESA)
-    # Para despesas, usamos a categoria/método como base descritiva automática
-    nova_desc = f"{nova_cat.split(' (')[0]} via {novo_metodo}"
+    novo_metodo = st.sidebar.selectbox("Forma de Pagamento", METODOS_PAGAMENTO, key="sb_metodo_des")
+    nova_cat = st.sidebar.selectbox("Categoria da Despesa", CATEGORIAS_DESPESA, key="sb_cat_des")
+    nova_desc = f"{nova_cat.split(' (')[0]} ({novo_metodo})"
     
-novo_valor = st.sidebar.number_input("Valor (€)", min_value=0.0, step=5.0)
-novas_parcelas = st.sidebar.number_input("Quantidade de Parcelas", min_value=1, max_value=12, value=1)
+novo_valor = st.sidebar.number_input("Valor (€)", min_value=0.0, step=5.0, key="sb_valor")
+novas_parcelas = st.sidebar.number_input("Quantidade de Parcelas", min_value=1, max_value=12, value=1, key="sb_parcelas")
 
-if st.sidebar.button("Salvar na Planilha"):
+# SISTEMA DE DISPARO INDEPENDENTE: Só roda uma vez ao carregar o clique
+if st.sidebar.button("Salvar na Planilha", key="btn_salvar_principal"):
     if novo_valor <= 0:
         st.sidebar.warning("⚠️ Insira um valor maior que 0€ antes de salvar!")
     elif novo_tipo == "Despesa" and not validar_cartao(nova_desc, novo_valor, novo_metodo):
@@ -103,8 +101,10 @@ if st.sidebar.button("Salvar na Planilha"):
             })
             data_atual += relativedelta(months=1)
         
-        st.session_state.banco_dados = pd.concat([st.session_state.banco_dados, pd.DataFrame(novos_dados)], ignore_index=True)
-        st.sidebar.success("✅ Adicionado com sucesso!")
+        # Junta os dados e limpa o gatilho imediatamente
+        df_novos = pd.DataFrame(novos_dados)
+        st.session_state.banco_dados = pd.concat([st.session_state.banco_dados, df_novos], ignore_index=True)
+        st.session_state.primeiro_acesso = False
         st.rerun()
 
 # ==============================================================================
@@ -112,130 +112,127 @@ if st.sidebar.button("Salvar na Planilha"):
 # ==============================================================================
 st.title("💰 Finanças Meire e Junior")
 
-st.session_state.banco_dados['Ano_Mes'] = pd.to_datetime(st.session_state.banco_dados['Data']).dt.strftime('%Y-%m')
-
-aba_mensal, aba_anual = st.tabs(["📅 Controle Mensal", "📊 Resumos Gerais (Anual e Parcelas)"])
-
-# ------------------------------------------------------------------------------
-# ABA 1: CONTROLE MENSAL (Organização Horizontal Completa)
-# ------------------------------------------------------------------------------
-with aba_mensal:
+# Trata tabela vazia de forma segura
+if not st.session_state.banco_dados.empty:
+    st.session_state.banco_dados['Ano_Mes'] = pd.to_datetime(st.session_state.banco_dados['Data']).dt.strftime('%Y-%m')
     meses_disponiveis = sorted(st.session_state.banco_dados['Ano_Mes'].unique())
-    mes_selecionado = st.selectbox("Escolha o Mês para Analisar", meses_disponiveis, key="filtro_mes")
-    
+else:
+    st.session_state.banco_dados['Ano_Mes'] = pd.Series(dtype='str')
+    meses_disponiveis = [datetime.now().strftime('%Y-%m')]
+
+mes_selecionado = st.selectbox("📅 Escolha o Mês para Analisar", meses_disponiveis, key="filtro_mes")
+
+# Filtragem segura do mês atual
+if not st.session_state.banco_dados.empty:
     df_mes = st.session_state.banco_dados[st.session_state.banco_dados['Ano_Mes'] == mes_selecionado].copy()
-    
-    # --- REGRA DO DINHEIRO VIVO ---
+else:
+    df_mes = pd.DataFrame(columns=["Data", "Descrição", "Tipo", "Valor", "Método", "Categoria", "Status", "Ano_Mes"])
+
+# --- CÁLCULOS MATEMÁTICOS DOS CARDS ---
+ganhou = df_mes[df_mes['Tipo'] == 'Receita']['Valor'].sum() if not df_mes.empty else 0.0
+gastou = df_mes[df_mes['Tipo'] == 'Despesa']['Valor'].sum() if not df_mes.empty else 0.0
+a_pagar = df_mes[(df_mes['Tipo'] == 'Despesa') & (df_mes['Status'] == 'Pendente')]['Valor'].sum() if not df_mes.empty else 0.0
+
+# Regra Dinheiro Vivo na Carteira
+if not df_mes.empty:
     df_receitas_pagas = df_mes[(df_mes['Tipo'] == 'Receita') & (df_mes['Status'] == 'Pago')]
     receitas_que_geram_dinheiro = df_receitas_pagas[
         ~df_receitas_pagas['Método'].isin(["VR Meire", "VR Junior", "Cartão Auchan Meire", "Cartão Auchan Junior"])
     ]['Valor'].sum()
-    
     despesas_pagas_em_dinheiro = df_mes[(df_mes['Tipo'] == 'Despesa') & (df_mes['Status'] == 'Pago') & (df_mes['Método'] == 'Dinheiro')]['Valor'].sum()
     saldo_dinheiro_carteira = receitas_que_geram_dinheiro - despesas_pagas_em_dinheiro
-    
-    ganhou = df_mes[df_mes['Tipo'] == 'Receita']['Valor'].sum()
-    gastou = df_mes[df_mes['Tipo'] == 'Despesa']['Valor'].sum()  # Correção efetuada aqui
-    a_pagar = df_mes[(df_mes['Tipo'] == 'Despesa') & (df_mes['Status'] == 'Pendente')]['Valor'].sum()
-    
-    col1, col2, col3, col4 = st.columns(4)
-    col1.metric("Ganhei no Mês", f"{ganhou:.2f}€")
-    col2.metric("Gasto No Mês", f"{gastou:.2f}€")
-    col3.error(f"A PAGAR AINDA: {a_pagar:.2f}€")
-    col4.success(f"💵 DINHEIRO NA CARTEIRA: {saldo_dinheiro_carteira:.2f}€")
-    
-    st.markdown("---")
-    
-    # BLOCO HORIZONTAL 1: RECEITAS
+else:
+    saldo_dinheiro_carteira = 0.0
+
+col1, col2, col3, col4 = st.columns(4)
+col1.metric("Ganhei no Mês", f"{ganhou:.2f}€")
+col2.metric("Gasto No Mês", f"{gastou:.2f}€")
+col3.error(f"A PAGAR AINDA: {a_pagar:.2f}€")
+col4.success(f"💵 DINHEIRO NA CARTEIRA: {saldo_dinheiro_carteira:.2f}€")
+
+st.markdown("---")
+
+aba_mensal, aba_anual = st.tabs(["📅 Controle Mensal", "📊 Resumos Gerais (Anual e Parcelas)"])
+
+with aba_mensal:
+    # HORIZONTAL 1: RECEITAS
     st.subheader("🍏 Receitas / Entradas")
-    df_rec_mes = df_mes[df_mes['Tipo'] == 'Receita']
+    df_rec_mes = df_mes[df_mes['Tipo'] == 'Receita'] if not df_mes.empty else pd.DataFrame()
+    
     if not df_rec_mes.empty:
         for idx, row in df_rec_mes.iterrows():
-            dia_entrada = datetime.strptime(row['Data'], "%Y-%m-%d").strftime("%d/%m")
-            
+            dia_entrada = datetime.strptime(str(row['Data']), "%Y-%m-%d").strftime("%d/%m")
             with st.container(border=True):
                 c1, c2, c3, c4 = st.columns([3, 2, 2, 2])
                 c1.write(f"**{row['Descrição']}**\n*{row['Categoria']}*")
                 c2.write(f"Valor: **{row['Valor']:.2f}€**")
                 c3.write(f"📅 Entrada: {dia_entrada}\n💳 {row['Método']}")
-                
                 with c4:
                     cc1, cc2 = st.columns(2)
                     if row['Status'] == 'Pendente':
-                        if cc1.button("Receber ✅", key=f"pago_{idx}"):
+                        if cc1.button("Receber ✅", key=f"pago_rec_{idx}"):
                             st.session_state.banco_dados.at[idx, 'Status'] = 'Pago'
                             st.rerun()
                     else:
                         cc1.write("🟢 Recebido")
-                    if cc2.button("Apagar ❌", key=f"del_{idx}"):
+                    if cc2.button("Apagar ❌", key=f"del_rec_{idx}"):
                         st.session_state.banco_dados = st.session_state.banco_dados.drop(idx)
                         st.rerun()
     else:
-        st.info("Nenhuma receita registada neste mês.")
+        st.info("Nenhuma receita registada para este mês.")
         
     st.markdown("---")
     
-    # BLOCO HORIZONTAL 2: DESPESAS
+    # HORIZONTAL 2: DESPESAS
     st.subheader("🛑 Despesas / Contas a Pagar")
-    df_des_mes = df_mes[df_mes['Tipo'] == 'Despesa']
+    df_des_mes = df_mes[df_mes['Tipo'] == 'Despesa'] if not df_mes.empty else pd.DataFrame()
+    
     if not df_des_mes.empty:
         for idx, row in df_des_mes.iterrows():
-            dia_vencimento = datetime.strptime(row['Data'], "%Y-%m-%d").strftime("%d/%m")
-            
+            dia_vencimento = datetime.strptime(str(row['Data']), "%Y-%m-%d").strftime("%d/%m")
             with st.container(border=True):
                 c1, c2, c3, c4 = st.columns([3, 2, 2, 2])
                 c1.write(f"**{row['Descrição']}**\n*{row['Categoria']}*")
                 c2.write(f"Valor: **{row['Valor']:.2f}€**")
                 c3.write(f"📅 Vencimento: {dia_vencimento}\n💳 {row['Método']}")
-                
                 with c4:
                     cc1, cc2 = st.columns(2)
                     if row['Status'] == 'Pendente':
-                        if cc1.button("Dar Baixa ✅", key=f"pago_{idx}"):
+                        if cc1.button("Dar Baixa ✅", key=f"pago_des_{idx}"):
                             st.session_state.banco_dados.at[idx, 'Status'] = 'Pago'
                             st.rerun()
                     else:
                         cc1.write("🟢 Pago")
-                    if cc2.button("Apagar ❌", key=f"del_{idx}"):
+                    if cc2.button("Apagar ❌", key=f"del_des_{idx}"):
                         st.session_state.banco_dados = st.session_state.banco_dados.drop(idx)
                         st.rerun()
-        else:
-            st.info("Nenhuma despesa registada neste mês.")
+    else:
+        st.info("Nenhuma despesa registada para este mês.")
         
     st.markdown("---")
     st.subheader("📊 Distribuição de Gastos do Mês")
-    df_gastos_mes = df_mes[df_mes['Tipo'] == 'Despesa']
-    if not df_gastos_mes.empty:
-        fig = px.pie(df_gastos_mes, values='Valor', names='Categoria', hole=0.4)
+    if not df_des_mes.empty:
+        fig = px.pie(df_des_mes, values='Valor', names='Categoria', hole=0.4)
         st.plotly_chart(fig, use_container_width=True)
 
-# ------------------------------------------------------------------------------
-# ABA 2: RESUMOS ANUAIS E CONTRATOS PARCELADOS
-# ------------------------------------------------------------------------------
 with aba_anual:
     st.subheader("📅 Resumo Anual (Fluxo Mês a Mês)")
-    
     if not st.session_state.banco_dados.empty:
         resumo_anual = st.session_state.banco_dados.groupby(['Ano_Mes', 'Tipo'])['Valor'].sum().unstack().fillna(0)
         if 'Receita' not in resumo_anual.columns: resumo_anual['Receita'] = 0.0
         if 'Despesa' not in resumo_anual.columns: resumo_anual['Despesa'] = 0.0
-        
         resumo_anual['Saldo_no_Mês'] = resumo_anual['Receita'] - resumo_anual['Despesa']
         resumo_anual['Saldo_Acumulado'] = resumo_anual['Saldo_no_Mês'].cumsum()
-        
         st.dataframe(resumo_anual.style.format("{:.2f}€"), use_container_width=True)
     
     st.markdown("---")
     st.subheader("📋 Resumo de Despesas Parceladas")
-    
-    df_parceladas = st.session_state.banco_dados[st.session_state.banco_dados['Descrição'].str.contains(r'\(\d+/\d+\)')].copy()
+    df_parceladas = st.session_state.banco_dados[st.session_state.banco_dados['Descrição'].str.contains(r'\(\d+/\d+\)')].copy() if not st.session_state.banco_dados.empty else pd.DataFrame()
     if not df_parceladas.empty:
         df_parceladas['Nome_Despesa'] = df_parceladas['Descrição'].str.split(' \(').str[0]
         hoje = datetime.now()
-        
         def calcular_atrasadas(series_status, series_data):
-            return sum(1 for s, d in zip(series_status, series_data) if s == 'Pendente' and datetime.strptime(d, "%Y-%m-%d") < hoje)
-            
+            return sum(1 for s, d in zip(series_status, series_data) if s == 'Pendente' and datetime.strptime(str(d), "%Y-%m-%d") < hoje)
         resumo_parcelas = df_parceladas.groupby('Nome_Despesa').agg(
             Valor_Parcela=('Valor', 'first'),
             Total_Parcelas=('Descrição', 'count'),
@@ -247,10 +244,3 @@ with aba_anual:
         st.dataframe(resumo_parcelas, use_container_width=True)
     else:
         st.info("Nenhuma conta parcelada ativa no momento.")
-        
-    st.markdown("---")
-    st.subheader("📊 Gráfico Anual por Categorias")
-    df_gastos_ano = st.session_state.banco_dados[st.session_state.banco_dados['Tipo'] == 'Despesa']
-    if not df_gastos_ano.empty:
-        fig_ano = px.bar(df_gastos_ano, x='Ano_Mes', y='Valor', color='Categoria', barmode='stack')
-        st.plotly_chart(fig_ano, use_container_width=True)
