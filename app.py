@@ -42,7 +42,8 @@ novas_parcelas = st.sidebar.number_input("Quantidade de Parcelas (Deixa 1 para c
 
 if st.sidebar.button("Salvar na Planilha"):
     if nova_desc and novo_valor > 0:
-        if not validar_cartao(nova_desc, ... = novo_valor, metodo = novo_metodo):
+        # CORREÇÃO EFETUADA: Retirados os caracteres inválidos que causavam o erro
+        if not validar_cartao(nova_desc, novo_valor, novo_metodo):
             st.sidebar.error("❌ BLOQUEADO: O 'Cartão Auchan Meire' não permite gastos acima de 50€ fora do grupo Auchan/Gasóleo!")
         else:
             novos_dados = []
@@ -111,7 +112,6 @@ st.markdown("---")
 st.subheader("📊 Gráficos de Gastos por Categoria")
 df_gastos_mes = df_mes[df_mes['Tipo'] == 'Despesa']
 if not df_gastos_mes.empty:
-    import plotly.express as px
     fig = px.pie(df_gastos_mes, values='Valor', names='Categoria', hole=0.4, title=f"Divisão de Despesas - {mes_selecionado}")
     st.plotly_chart(fig, use_container_width=True)
 else:
