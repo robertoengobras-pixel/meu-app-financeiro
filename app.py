@@ -37,7 +37,7 @@ CATEGORIAS_RECEITA = [
     "Subsídios & Prémios",
     "Ajudas de Custo / Gasóleo",
     "Empréstimos Recebidos",
-    "Cartão de Crédito",  # Adicionado conforme solicitado
+    "Cartão de Crédito",
     "Outras Entradas"
 ]
 
@@ -49,17 +49,45 @@ if 'banco_dados' not in st.session_state:
     st.session_state.primeiro_acesso = True
 
 # ==============================================================================
-# 🧠 REGRAS DE NEGÓCIO (Trava de Segurança Corrigida)
+# 🧠 REGRAS DE NEGÓCIO (Nova Trava de Teto Acumulado do Cartão Auchan Meire)
 # ==============================================================================
-def validar_cartao_auchan(metodo, valor, categoria, subdespesa):
-    if str(metodo).strip() == "Cartão Auchan Meire":
-        if valor > 50.0:
-            # Só permite se for da categoria Transportes/Gasóleo OU se escreverem "auchan" na especificação
-            eh_gasoleo = "Transportes" in str(categoria)
-            contem_auchan = "auchan" in str(subdespesa).lower()
-            if not (eh_gasoleo or contem_auchan):
-                return False
-    return True
+def validar_teto_cartao_auchan(novo_valor, categoria, subdespesa, mes_alvo):
+    # Filtrar os gastos que já existem na planilha para o Cartão Auchan Meire no mês escolhido
+    df = st.session_state.banco_dados
+    if df.empty:
+        gastos_atuais_fora = 0.0
+        gastos_atuais_total = 0.0
+    else:
+        df['Ano_Mes_Tmp'] = pd.to_datetime(df['Data']).dt.strftime('%Y-%m')
+        df_cartao_mes = df[(df['Tipo'] == 'Despesa') & (df['Método'] == 'Cartão Auchan Meire') & (df['Ano_Mes_Tmp'] == mes_alvo)]
+        
+        if df_cartao_mes.empty:
+            gastos_atuais_fora = 0.0
+            gastos_atuais_total = 0.0
+        else:
+            # Identifica o que foi gasto fora do grupo Auchan
+            gastos_fora = df_cartao_mes[
+                ~df_cartao_mes['Categoria'].str.contains("Transportes") & 
+                ~df_cartao_mes['Descrição'].str.lower().str.contains("auchan")
+            ]
+            gastos_atuais_fora = gastos_fora['Valor'].sum()
+            gastos_atuais_total = df_cartao_mes['Valor'].sum()
+
+    # Verifica se a nova despesa pertence ou não ao Grupo Auchan
+    eh_gasoleo_ou_carro = "Transportes" in str(categoria)
+    contem_nome_auchan = "auchan" in str(subdespesa).lower()
+    eh_grupo_auchan = eh_gasoleo_ou_carro or contem_nome_auchan
+
+    # 1. Validação do Limite Total do Cartão (165€)
+    if gastos_atuais_total + novo_valor > 165.0:
+        return False, f"❌ BLOQUEADO: Este lançamento ultrapassa o limite total mensal do cartão de 165,00€! (Já gasto no mês: {gastos_atuais_total:.2f}€)"
+
+    # 2. Validação do Teto Extra-Auchan (50€)
+    if not eh_grupo_auchan:
+        if gastos_atuais_fora + novo_valor > 50.0:
+            return False, f"❌ BLOQUEADO: Limite de 50,00€ para gastos fora do grupo Auchan/Gasolineira foi excedido! (Já gasto fora: {gastos_atuais_fora:.2f}€)"
+
+    return True, ""
 
 # ==============================================================================
 # ➕ INTERFACE: BARRA LATERAL
@@ -69,7 +97,7 @@ st.sidebar.header("➕ Novo Lançamento")
 nova_data = st.sidebar.date_input("Data de Vencimento / Entrada", datetime.now())
 novo_tipo = st.sidebar.selectbox("Tipo de Fluxo", ["Despesa", "Receita"], key="sb_tipo")
 
-sub_despesa = ""  # Inicialização limpa
+sub_despesa = ""
 
 if novo_tipo == "Receita":
     novo_metodo = st.sidebar.selectbox("Forma de Receita", RECEITAS_PERMITIDAS, key="sb_metodo_rec")
@@ -79,10 +107,8 @@ else:
     novo_metodo = st.sidebar.selectbox("Forma de Pagamento", METODOS_PAGAMENTO, key="sb_metodo_des")
     nova_cat = st.sidebar.selectbox("Categoria da Despesa", CATEGORIAS_DESPESA, key="sb_cat_des")
     
-    # NOVO CAMPO: Identificar o que é especificamente a despesa (Ex: Aluguel)
     sub_despesa = st.sidebar.text_input("O que é esta despesa? (Ex: Aluguer, Luz, Pingo Doce)", key="sb_sub_desc")
     
-    # Constrói a descrição final combinando a Categoria simplificada e o detalhe que escreveste
     nome_cat_limpo = nova_cat.split('/')[0].split(' (')[0]
     detalhe = f" - {sub_despesa}" if sub_despesa else ""
     nova_desc = f"{nome_cat_limpo}{detalhe} ({novo_metodo})"
@@ -91,33 +117,41 @@ novo_valor = st.sidebar.number_input("Valor (€)", min_value=0.0, step=5.0, key
 novas_parcelas = st.sidebar.number_input("Quantidade de Parcelas", min_value=1, max_value=12, value=1, key="sb_parcelas")
 
 if st.sidebar.button("Salvar na Planilha", key="btn_salvar_principal"):
+    mes_alvo_cadastro = nova_data.strftime('%Y-%m')
+    
     if novo_valor <= 0:
         st.sidebar.warning("⚠️ Insira um valor maior que 0€ antes de salvar!")
     elif novo_tipo == "Despesa" and not sub_despesa:
         st.sidebar.warning("⚠️ Por favor, preencha o campo informando o que é a despesa!")
-    # Executa a validação corrigida e robusta do cartão Auchan
-    elif novo_tipo == "Despesa" and not validar_cartao_auchan(novo_metodo, novo_valor, nova_cat, sub_despesa):
-        st.sidebar.error("❌ BLOQUEADO: O 'Cartão Auchan Meire' não permite gastos acima de 50€ fora do grupo Auchan ou Gasóleo!")
     else:
-        novos_dados = []
-        data_atual = nova_data
-        for i in range(1, novas_parcelas + 1):
-            desc_final = f"{nova_desc} ({i}/{novas_parcelas})" if novas_parcelas > 1 else nova_desc
-            novos_dados.append({
-                "Data": data_atual.strftime("%Y-%m-%d"),
-                "Descrição": desc_final,
-                "Tipo": novo_tipo,
-                "Valor": float(novo_valor),
-                "Método": novo_metodo,
-                "Categoria": nova_cat,
-                "Status": "Pendente"
-            })
-            data_atual += relativedelta(months=1)
-        
-        df_novos = pd.DataFrame(novos_dados)
-        st.session_state.banco_dados = pd.concat([st.session_state.banco_dados, df_novos], ignore_index=True)
-        st.session_state.primeiro_acesso = False
-        st.rerun()
+        # Executa a nova validação acumulada se for o Cartão Auchan Meire
+        valido = True
+        msg_erro = ""
+        if novo_tipo == "Despesa" and str(novo_metodo).strip() == "Cartão Auchan Meire":
+            valido, msg_erro = validar_teto_cartao_auchan(novo_valor, nova_cat, sub_despesa, mes_alvo_cadastro)
+            
+        if not valido:
+            st.sidebar.error(msg_erro)
+        else:
+            novos_dados = []
+            data_atual = nova_data
+            for i in range(1, novas_parcelas + 1):
+                desc_final = f"{nova_desc} ({i}/{novas_parcelas})" if novas_parcelas > 1 else nova_desc
+                novos_dados.append({
+                    "Data": data_atual.strftime("%Y-%m-%d"),
+                    "Descrição": desc_final,
+                    "Tipo": novo_tipo,
+                    "Valor": float(novo_valor),
+                    "Método": novo_metodo,
+                    "Categoria": nova_cat,
+                    "Status": "Pendente"
+                })
+                data_atual += relativedelta(months=1)
+            
+            df_novos = pd.DataFrame(novos_dados)
+            st.session_state.banco_dados = pd.concat([st.session_state.banco_dados, df_novos], ignore_index=True)
+            st.session_state.primeiro_acesso = False
+            st.rerun()
 
 # ==============================================================================
 # 📊 INTERFACE PRINCIPAL
@@ -163,7 +197,7 @@ if not df_mes.empty:
 else:
     saldo_dinheiro_carteira = 0.0
 
-# Hierarchy Grid Layout
+# Layout Visual por Linhas
 st.markdown("#### 📊 Balanço Geral do Mês")
 top_col1, top_col2 = st.columns(2)
 top_col1.metric("🍏 Ganhei no Mês", f"{ganhou:.2f}€")
