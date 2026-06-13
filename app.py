@@ -1,6 +1,6 @@
 import streamlit as st
 import pandas as pd
-from datetime import datetime  # CORREÇÃO AQUI: Importação adicionada!
+from datetime import datetime
 from dateutil.relativedelta import relativedelta
 import plotly.express as px
 
@@ -53,7 +53,8 @@ if 'banco_dados' not in st.session_state:
 # 🧠 REGRAS DE NEGÓCIO
 # ==============================================================================
 def validar_cartao(descricao, valor, metodo):
-    if str(metodo) == "Cartão Auchan Meire":
+    # Comparação inteligente ignorando maiúsculas/minúsculas
+    if str(metodo).strip().lower() == "cartão auchan meire":
         desc_lower = str(descricao).lower()
         contem_auchan = "auchan" in desc_lower or "gasóleo" in desc_lower
         if not contem_auchan and valor > 50.0:
@@ -61,21 +62,22 @@ def validar_cartao(descricao, valor, metodo):
     return True
 
 # ==============================================================================
-# ➕ INTERFACE: BARRA LATERAL COM FORMULÁRIO BLINDADO
+# ➕ INTERFACE: BARRA LATERAL COM FORMULÁRIO (CHAVES ÚNICAS BLINDADAS)
 # ==============================================================================
 st.sidebar.header("➕ Novo Lançamento")
 
 with st.sidebar.form(key="formulario_cadastro", clear_on_submit=True):
     nova_data = st.date_input("Data do Lançamento", datetime.now())
     nova_desc = st.text_input("Descrição da Conta / Origem")
-    novo_tipo = st.selectbox("Tipo de Fluxo", ["Despesa", "Receita"])
+    novo_tipo = st.selectbox("Tipo de Fluxo", ["Despesa", "Receita"], key="fluxo_select")
     
+    # RESOLUÇÃO DO ERRO: Adicionadas chaves (keys) únicas para cada elemento
     if novo_tipo == "Receita":
-        novo_metodo = st.selectbox("Forma de Receita", RECEITAS_PERMITIDAS)
-        nova_cat = st.selectbox("Categoria da Receita", CATEGORIAS_RECEITA)
+        novo_metodo = st.selectbox("Forma de Receita", RECEITAS_PERMITIDAS, key="receita_metodo_select")
+        nova_cat = st.selectbox("Categoria da Receita", CATEGORIAS_RECEITA, key="receita_cat_select")
     else:
-        novo_metodo = st.selectbox("Forma de Pagamento", METODOS_PAGAMENTO)
-        nova_cat = st.selectbox("Categoria da Despesa", CATEGORIAS_DESPESA)
+        novo_metodo = st.selectbox("Forma de Pagamento", METODOS_PAGAMENTO, key="despesa_metodo_select")
+        nova_cat = st.selectbox("Categoria da Despesa", CATEGORIAS_DESPESA, key="despesa_cat_select")
         
     novo_valor = st.number_input("Valor (€)", min_value=0.0, step=5.0)
     novas_parcelas = st.number_input("Quantidade de Parcelas", min_value=1, max_value=12, value=1)
@@ -217,4 +219,8 @@ with aba_anual:
         st.info("Nenhuma conta parcelada ativa no momento.")
         
     st.markdown("---")
-    st.subheader("📊 Gráfico
+    st.subheader("📊 Gráfico Anual por Categorias")
+    df_gastos_ano = st.session_state.banco_dados[st.session_state.banco_dados['Tipo'] == 'Despesa']
+    if not df_gastos_ano.empty:
+        fig_ano = px.bar(df_gastos_ano, x='Ano_Mes', y='Valor', color='Categoria', barmode='stack')
+        st.plotly_chart(fig_ano, use_container_width=True)
