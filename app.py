@@ -1,26 +1,31 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime
+from dateutil.relativedelta import relativedelta
+import plotly.express as px
+from streamlit_gsheets import GSheetsConnection
 
 # Configuração da página
 st.set_page_config(layout="wide", page_title="Finanças Meire e Junior")
 
+# Link da tua planilha
+URL_PLANILHA = "https://docs.google.com/spreadsheets/d/1dusMDuXQC4a2xiotVm5Gm4vKrc22VcBudsgeupB55OY/edit?gid=0#gid=0"
+
+# Listas de apoio
+RECEITAS_PERMITIDAS = ["Ordenado Meire", "Ordenado Junior", "VR Meire", "VR Junior", "Cartão Auchan Meire", "Cartão Auchan Junior", "Subs. Férias Meire", "Subs. Férias Junior", "Gasóleo DDN", "Prêmio Junior", "Prêmio Meire", "Empréstimo Aline", "Empréstimo Gabriel"]
+METODOS_PAGAMENTO = ["Dinheiro", "Cartão Auchan Meire", "Cartão Auchan Junior", "Vale Refeição Junior", "Vale Refeição Meire"]
+CATEGORIAS_DESPESA = ["Habitação/Casa (Renda, EDP, Água, Internet)", "Transportes (Gasóleo, Via Verde, Carro)", "Supermercado/Alimentação", "Família/Filhos (Creche, Explicações, ATL)", "Saúde & Seguros", "Créditos/Financiamentos", "Outros/Diversos"]
+CATEGORIAS_RECEITA = ["Salário/Ordenado", "Subsídios & Prémios", "Ajudas de Custo / Gasóleo", "Empréstimos Recebidos", "Cartão de Crédito", "Outras Entradas"]
+
+# Conexão
+conn = st.connection("gsheets", type=GSheetsConnection)
+df = conn.read(spreadsheet=URL_PLANILHA, ttl=0)
+
+# Inicialização do estado
+if 'banco_dados' not in st.session_state:
+    st.session_state.banco_dados = df
+
+# Interface (O resto do código segue a lógica de cálculos que tínhamos)
 st.title("💰 Finanças Meire e Junior")
 
-# Interface simples para verificares que o app está a rodar
-st.subheader("Bem-vindo de volta ao sistema base!")
-st.write("O sistema está online e funcional.")
-
-# Exemplo de como podes ter os teus dados visualmente
-data = {
-    "Data": [datetime.now().strftime("%Y-%m-%d")],
-    "Descrição": ["Sistema reiniciado"],
-    "Tipo": ["Receita"],
-    "Valor": [0.0],
-    "Categoria": ["Outros"]
-}
-
-df_teste = pd.DataFrame(data)
-st.dataframe(df_teste, use_container_width=True)
-
-st.info("O sistema está limpo e a funcionar. Agora podes construir os teus lançamentos a partir daqui!")
+# ... [Aqui entrava o restante da lógica de Interface e botões que tínhamos] ...
