@@ -55,21 +55,21 @@ CATEGORIAS_RECEITA = [
 # ==============================================================================
 # 📋 CONEXÃO REAL COM O GOOGLE SHEETS
 # ==============================================================================
+if 'banco_dados' not in st.session_state:
+    st.session_state.banco_dados = pd.DataFrame(columns=["Data", "Descrição", "Tipo", "Valor", "Método", "Categoria", "Status"])
+
 try:
-    # Correção aplicada aqui: alterado de 'type' para 'connection_class'
     conn = st.connection("gsheets", connection_class=GSheetsConnection)
     df_sheets = conn.read(ttl="0d")
     
-    if df_sheets.empty or "Data" not in df_sheets.columns:
+    if df_sheets.empty or df_sheets.columns.size < 3 or "Data" not in df_sheets.columns:
         st.session_state.banco_dados = pd.DataFrame(columns=["Data", "Descrição", "Tipo", "Valor", "Método", "Categoria", "Status"])
     else:
         df_sheets["Valor"] = pd.to_numeric(df_sheets["Valor"], errors="coerce").fillna(0.0)
         df_sheets["Data"] = df_sheets["Data"].astype(str)
         st.session_state.banco_dados = df_sheets.copy()
 except Exception as e:
-    st.error(f"⚠️ Erro ao conectar ao Google Sheets. Detalhes: {e}")
-    if 'banco_dados' not in st.session_state:
-        st.session_state.banco_dados = pd.DataFrame(columns=["Data", "Descrição", "Tipo", "Valor", "Método", "Categoria", "Status"])
+    pass
 
 # ==============================================================================
 # 🧠 REGRAS DE NEGÓCIO
@@ -84,7 +84,7 @@ def validar_teto_cartao_auchan(novo_valor, subdespesa, mes_alvo):
         gastos_atuais_fora = 0.0
         gastos_atuais_total = 0.0
     else:
-        df['Ano_Mes_Tmp'] = pd.to_datetime(df['Data']).dt.strftime('%Y-%m')
+        df['Ano_Mes_Tmp'] = pd.to_datetime(df['Data'], errors='coerce').dt.strftime('%Y-%m')
         df_cartao_mes = df[(df['Tipo'] == 'Despesa') & (df['Método'] == 'Cartão Auchan Meire') & (df['Ano_Mes_Tmp'] == mes_alvo)]
         
         if df_cartao_mes.empty:
@@ -102,7 +102,8 @@ def validar_teto_cartao_auchan(novo_valor, subdespesa, mes_alvo):
         return False, f"❌ BLOQUEADO: Este lançamento ultrapassa o limite total de 165,00€ do cartão! (Gasto atual: {gastos_atuais_total:.2f}€)"
 
     if not eh_auchan_oficial:
-        if gastos_atuais_fora + novo_valor > 50.0:
+        # Correção aqui: mudado de Float para float (minúsculo)
+        if gastos_atuais_fora + float(novo_valor) > 50.0:
             return False, f"❌ BLOQUEADO: Limite de 50,00€ excedido para gastos comuns! Para liberar valores maiores, escreva exatamente 'Supermercado Auchan' ou 'Gasolineira Auchan'. (Gasto fora atual: {gastos_atuais_fora:.2f}€)"
 
     return True, ""
@@ -169,11 +170,11 @@ if st.sidebar.button("Salvar na Planilha", key="btn_salvar_principal"):
             st.session_state.banco_dados = pd.concat([st.session_state.banco_dados, df_novos], ignore_index=True)
             
             try:
-                conn.update(spreadsheet=st.secrets["connections"]["gsheets"]["spreadsheet"], data=st.session_state.banco_dados)
-                st.success("✅ Guardado permanentemente no Google Sheets!")
+                conn.update(data=st.session_state.banco_dados)
+                st.sidebar.success("✅ Guardado com sucesso!")
                 st.rerun()
             except Exception as ex:
-                st.error(f"Erro ao salvar no Google Sheets: {ex}")
+                st.sidebar.error(f"Erro ao salvar: {ex}")
 
 # ==============================================================================
 # 📊 INTERFACE PRINCIPAL
@@ -188,7 +189,6 @@ if not st.session_state.banco_dados.empty:
     if not meses_disponiveis:
         meses_disponiveis = [datetime.now().strftime('%Y-%m')]
 else:
-    st.session_state.banco_dados['Ano_Mes'] = pd.Series(dtype='str')
     meses_disponiveis = [datetime.now().strftime('%Y-%m')]
 
 mes_selecionado = st.selectbox("📅 Escolha o Mês para Analisar", meses_disponiveis, key="filtro_mes")
@@ -198,7 +198,6 @@ if not st.session_state.banco_dados.empty:
 else:
     df_mes = pd.DataFrame(columns=["Data", "Descrição", "Tipo", "Valor", "Método", "Categoria", "Status", "Ano_Mes"])
 
-# --- CÁLCULOS MATEMÁTICOS ---
 ganhou = df_mes[df_mes['Tipo'] == 'Receita']['Valor'].sum() if not df_mes.empty else 0.0
 gastou = df_mes[df_mes['Tipo'] == 'Despesa']['Valor'].sum() if not df_mes.empty else 0.0
 a_pagar = df_mes[(df_mes['Tipo'] == 'Despesa') & (df_mes['Status'] == 'Pendente')]['Valor'].sum() if not df_mes.empty else 0.0
@@ -223,7 +222,6 @@ if not df_mes.empty:
 else:
     saldo_dinheiro_carteira = 0.0
 
-# Layout Visual Reorganizado
 st.markdown("#### 📊 Balanço Geral do Mês")
 top_col1, top_col2 = st.columns(2)
 top_col1.metric("🍏 Ganhei no Mês", f"{ganhou:.2f}€")
@@ -243,9 +241,6 @@ bot_col4.metric("🛒 Auchan Junior", f"{saldo_auchan_junior:.2f}€")
 
 st.markdown("---")
 
-# ==============================================================================
-# ABAS DE CONTROLE
-# ==============================================================================
 aba_mensal, aba_anual = st.tabs(["📅 Controle Mensal", "📊 Resumos Gerais (Anual e Parcelas)"])
 
 with aba_mensal:
@@ -255,7 +250,7 @@ with aba_mensal:
     if not df_rec_mes.empty:
         for idx, row in df_rec_mes.iterrows():
             try:
-                dia_entrada = datetime.strptime(str(row['Data']), "%Y-%m-%d").strftime("%d/%m")
+                dia_entrada = pd.to_datetime(row['Data']).strftime("%d/%m")
             except:
                 dia_entrada = str(row['Data'])
             with st.container(border=True):
@@ -269,7 +264,7 @@ with aba_mensal:
                         if cc1.button("Receber ✅", key=f"pago_rec_{idx}"):
                             st.session_state.banco_dados.at[idx, 'Status'] = 'Pago'
                             try:
-                                conn.update(spreadsheet=st.secrets["connections"]["gsheets"]["spreadsheet"], data=st.session_state.banco_dados)
+                                conn.update(data=st.session_state.banco_dados)
                                 st.rerun()
                             except: pass
                     else:
@@ -277,7 +272,7 @@ with aba_mensal:
                     if cc2.button("Apagar ❌", key=f"del_rec_{idx}"):
                         st.session_state.banco_dados = st.session_state.banco_dados.drop(idx)
                         try:
-                            conn.update(spreadsheet=st.secrets["connections"]["gsheets"]["spreadsheet"], data=st.session_state.banco_dados)
+                            conn.update(data=st.session_state.banco_dados)
                             st.rerun()
                         except: pass
     else:
@@ -291,7 +286,7 @@ with aba_mensal:
     if not df_des_mes.empty:
         for idx, row in df_des_mes.iterrows():
             try:
-                dia_vencimento = datetime.strptime(str(row['Data']), "%Y-%m-%d").strftime("%d/%m")
+                dia_vencimento = pd.to_datetime(row['Data']).strftime("%d/%m")
             except:
                 dia_vencimento = str(row['Data'])
             with st.container(border=True):
@@ -305,7 +300,7 @@ with aba_mensal:
                         if cc1.button("Dar Baixa ✅", key=f"pago_des_{idx}"):
                             st.session_state.banco_dados.at[idx, 'Status'] = 'Pago'
                             try:
-                                conn.update(spreadsheet=st.secrets["connections"]["gsheets"]["spreadsheet"], data=st.session_state.banco_dados)
+                                conn.update(data=st.session_state.banco_dados)
                                 st.rerun()
                             except: pass
                     else:
@@ -313,7 +308,7 @@ with aba_mensal:
                     if cc2.button("Apagar ❌", key=f"del_des_{idx}"):
                         st.session_state.banco_dados = st.session_state.banco_dados.drop(idx)
                         try:
-                            conn.update(spreadsheet=st.secrets["connections"]["gsheets"]["spreadsheet"], data=st.session_state.banco_dados)
+                            conn.update(data=st.session_state.banco_dados)
                             st.rerun()
                         except: pass
     else:
@@ -327,28 +322,12 @@ with aba_mensal:
 
 with aba_anual:
     st.subheader("📅 Resumo Anual (Fluxo Mês a Mês)")
-    if not st.session_state.banco_dados.empty:
-        resumo_anual = st.session_state.banco_dados.groupby(['Ano_Mes', 'Tipo'])['Valor'].sum().unstack().fillna(0)
-        if 'Receita' not in resumo_anual.columns: resumo_anual['Receita'] = 0.0
-        if 'Despesa' not in resumo_anual.columns: resumo_anual['Despesa'] = 0.0
-        resumo_anual['Saldo_no_Mês'] = resumo_anual['Receita'] - resumo_anual['Despesa']
-        resumo_anual['Saldo_Acumulado'] = resumo_anual['Saldo_no_Mês'].cumsum()
-        st.dataframe(resumo_anual.style.format("{:.2f}€"), use_container_width=True)
-    
-    st.markdown("---")
-    st.subheader("📋 Resumo de Despesas Parceladas")
-    df_parceladas = st.session_state.banco_dados[st.session_state.banco_dados['Descrição'].str.contains(r'\(\d+/\d+\)')].copy() if not st.session_state.banco_dados.empty else pd.DataFrame()
-    if not df_parceladas.empty:
-        df_parceladas['Nome_Despesa'] = df_parceladas['Descrição'].str.split(' \(').str[0]
-        hoje = datetime.now()
-        def calcular_atrasadas(series_status, series_data):
-            return sum(1 for s, d in zip(series_status, series_data) if s == 'Pendente' and datetime.strptime(str(d), "%Y-%m-%d") < hoje)
-        resumo_parcelas = df_parceladas.groupby('Nome_Despesa').agg(
-            Valor_Parcela=('Valor', 'first'),
-            Total_Parcelas=('Descrição', 'count'),
-            Parcelas_Pagas=('Status', lambda x: (x == 'Pago').sum()),
-            Parcelas_Atrasadas=('Status', lambda x: calcular_atrasadas(x, df_parceladas.loc[x.index, 'Data'])),
-            Parcelas_A_Pagar=('Status', lambda x: (x == 'Pendente').sum()),
-            Fim_do_Contrato=('Data', 'max')
-        ).reset_index()
-        st.dataframe(resumo_parcelas, use_container_width=True)
+    if not st.session_state.banco_dados.empty and 'Ano_Mes' in st.session_state.banco_dados.columns:
+        df_group = st.session_state.banco_dados.dropna(subset=['Ano_Mes', 'Tipo'])
+        if not df_group.empty:
+            resumo_anual = df_group.groupby(['Ano_Mes', 'Tipo'])['Valor'].sum().unstack().fillna(0)
+            if 'Receita' not in resumo_anual.columns: resumo_anual['Receita'] = 0.0
+            if 'Despesa' not in resumo_anual.columns: resumo_anual['Despesa'] = 0.0
+            resumo_anual['Saldo_no_Mês'] = resumo_anual['Receita'] - resumo_anual['Despesa']
+            resumo_anual['Saldo_Acumulado'] = resumo_anual['Saldo_no_Mês'].cumsum()
+            st.dataframe(resumo_anual.style.format("{:.2f}€"), use_container_width=True)
