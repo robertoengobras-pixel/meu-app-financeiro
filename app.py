@@ -53,10 +53,11 @@ CATEGORIAS_RECEITA = [
 ]
 
 # ==============================================================================
-# 📋 CONEXÃO REAL COM O GOOGLE SHEETS
+# 📋 CONEXÃO REAL COM O GOOGLE SHEETS (RESOLUÇÃO DO ERRO DE CONEXÃO)
 # ==============================================================================
 try:
-    conn = st.connection("gsheets", type=GSheetsConnection)
+    # Ajuste do argumento connection_class exigido pela versão do Streamlit
+    conn = st.connection("gsheets", connection_class=GSheetsConnection)
     df_sheets = conn.read(ttl="0d")
     
     if df_sheets.empty or "Data" not in df_sheets.columns:
@@ -222,7 +223,7 @@ if not df_mes.empty:
 else:
     saldo_dinheiro_carteira = 0.0
 
-# Layout Visual
+# Layout Visual Reorganizado
 st.markdown("#### 📊 Balanço Geral do Mês")
 top_col1, top_col2 = st.columns(2)
 top_col1.metric("🍏 Ganhei no Mês", f"{ganhou:.2f}€")
