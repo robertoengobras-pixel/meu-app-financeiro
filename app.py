@@ -232,7 +232,7 @@ st.markdown("---")
 # ==============================================================================
 aba_mensal, aba_anual = st.tabs(["📅 Controle Mensal", "📊 Resumos Gerais (Anual e Parcelas)"])      
 with aba_mensal:
-    # 1. BLOCO DE RECEITAS (Corrigido para botões lado a lado)
+    # 1. BLOCO DE RECEITAS
     st.subheader("🍏 Receitas / Entradas")
     df_rec_mes = df_mes[df_mes['Tipo'] == 'Receita'] if not df_mes.empty else pd.DataFrame()
     if not df_rec_mes.empty:
@@ -243,50 +243,52 @@ with aba_mensal:
                 c1.write(f"**{row['Descrição']}**\n*{row['Categoria']}*")
                 c2.write(f"Valor: **{row['Valor']:.2f}€**")
                 c3.write(f"📅 Entrada: {dia_entrada}\n💳 {row['Método']}")
-                
                 with c4:
-                    cc1, cc2 = st.columns(2) # <--- O SEGREDO ESTÁ AQUI
-                    
+                    cc1, cc2 = st.columns(2)
                     if row['Status'] == 'Pendente':
                         if cc1.button("Receber ✅", key=f"pago_rec_{idx}"):
                             st.session_state.banco_dados.at[idx, 'Status'] = 'Pago'
                             st.rerun()
                     else:
                         cc1.write("🟢 Recebido")
-                    
                     if cc2.button("Apagar ❌", key=f"del_rec_{idx}"):
                         st.session_state.banco_dados = st.session_state.banco_dados.drop(idx)
                         st.rerun()
     else:
         st.info("Nenhuma receita registada para este mês.")
-        
-st.markdown("---")
 
-st.subheader("🛑 Despesas / Contas a Pagar")
-df_des_mes = df_des_mes = df_mes[df_mes['Tipo'] == 'Despesa'] if not df_mes.empty else pd.DataFrame()
+    st.markdown("---")
 
-if not df_des_mes.empty:
-    for idx, row in df_des_mes.iterrows():
-        dia_vencimento = datetime.strptime(str(row['Data']), "%Y-%m-%d").strftime("%d/%m")
-        with st.container(border=True):
-            c1, c2, c3, c4 = st.columns([3, 2, 2, 2])
-            c1.write(f"**{row['Descrição']}**\n*{row['Categoria']}*")
-            c2.write(f"Valor: **{row['Valor']:.2f}€**")
-            c3.write(f"📅 Vencimento: {dia_vencimento}\n💳 {row['Método']}")
-            with c4:
-                cc1, cc2 = st.columns(2)
-                if row['Status'] == 'Pendente':
-                    if cc1.button("Dar Baixa ✅", key=f"pago_des_{idx}"):
-                        st.session_state.banco_dados.at[idx, 'Status'] = 'Pago'
+    # 2. BLOCO DE DESPESAS (AGORA DENTRO DO WITH ABA_MENSAL)
+    st.subheader("🛑 Despesas / Contas a Pagar")
+    df_des_mes = df_mes[df_mes['Tipo'] == 'Despesa'] if not df_mes.empty else pd.DataFrame()
+
+    if not df_des_mes.empty:
+        for idx, row in df_des_mes.iterrows():
+            dia_vencimento = datetime.strptime(str(row['Data']), "%Y-%m-%d").strftime("%d/%m")
+            with st.container(border=True):
+                c1, c2, c3, c4 = st.columns([3, 2, 2, 2])
+                c1.write(f"**{row['Descrição']}**\n*{row['Categoria']}*")
+                c2.write(f"Valor: **{row['Valor']:.2f}€**")
+                c3.write(f"📅 Vencimento: {dia_vencimento}\n💳 {row['Método']}")
+                with c4:
+                    cc1, cc2 = st.columns(2)
+                    if row['Status'] == 'Pendente':
+                        if cc1.button("Dar Baixa ✅", key=f"pago_des_{idx}"):
+                            st.session_state.banco_dados.at[idx, 'Status'] = 'Pago'
+                            st.rerun()
+                    else:
+                        cc1.write("🟢 Pago")
+                    if cc2.button("Apagar ❌", key=f"del_des_{idx}"):
+                        st.session_state.banco_dados = st.session_state.banco_dados.drop(idx)
                         st.rerun()
-                else:
-                    cc1.write("🟢 Pago")
-                
-                if cc2.button("Apagar ❌", key=f"del_des_{idx}"):
-                    st.session_state.banco_dados = st.session_state.banco_dados.drop(idx)
-                    st.rerun()
-else:
-    st.info("Nenhuma despesa registada para este mês.")
+        
+        st.markdown("---")
+        st.subheader("📊 Distribuição de Gastos do Mês")
+        fig = px.pie(df_des_mes, values='Valor', names='Categoria', hole=0.4)
+        st.plotly_chart(fig, use_container_width=True)
+    else:
+        st.info("Nenhuma despesa registada para este mês.")
         
     st.markdown("---")
     st.subheader("📊 Distribuição de Gastos do Mês")
