@@ -153,7 +153,8 @@ if st.sidebar.button("Salvar na Planilha", key="btn_salvar_principal"):
                     "Status": "Pendente"
                 })
                 data_atual += relativedelta(months=1)
-            
+
+            novos_dados = []
             df_novos = pd.DataFrame(novos_dados)
             st.session_state.banco_dados = pd.concat([st.session_state.banco_dados, df_novos], ignore_index=True)
             conn.update(data=st.session_state.banco_dados)
