@@ -3,6 +3,7 @@ import pandas as pd
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
 import plotly.express as px
+from streamlit_gsheets import GSheetsConnection  # <--- Nova linha a adicionar
 
 # Configuração da página para o modo estendido (visual moderno)
 st.set_page_config(layout="wide", page_title="Finanças Meire e Junior")
