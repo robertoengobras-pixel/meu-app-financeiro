@@ -159,7 +159,6 @@ if st.sidebar.button("Salvar na Planilha", key="btn_salvar_principal"):
             
             # Concatenar com os dados existentes
             st.session_state.banco_dados = pd.concat([st.session_state.banco_dados, df_novos], ignore_index=True)
-            
             st.sidebar.success("Lançamento adicionado à memória! (Exporta o CSV para guardar na Planilha)")
             st.session_state.primeiro_acesso = False
             st.rerun()
