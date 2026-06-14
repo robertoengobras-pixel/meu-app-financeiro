@@ -139,11 +139,11 @@ if st.sidebar.button("Salvar na Planilha", key="btn_salvar_principal"):
         if not valido:
             st.sidebar.error(msg_erro)
         else:
-            novos_dados = []
+            lista_lancamentos = [] # Usamos um nome novo para evitar confusões
             data_atual = nova_data
             for i in range(1, novas_parcelas + 1):
                 desc_final = f"{nova_desc} ({i}/{novas_parcelas})" if novas_parcelas > 1 else nova_desc
-                novos_dados.append({
+                lista_lancamentos.append({
                     "Data": data_atual.strftime("%Y-%m-%d"),
                     "Descrição": desc_final,
                     "Tipo": novo_tipo,
@@ -154,10 +154,12 @@ if st.sidebar.button("Salvar na Planilha", key="btn_salvar_principal"):
                 })
                 data_atual += relativedelta(months=1)
 
-            novos_dados = []
-            df_novos = pd.DataFrame(novos_dados)
+            # Criar DataFrame com a lista correta
+            df_novos = pd.DataFrame(lista_lancamentos)
+            
+            # Concatenar com os dados existentes
             st.session_state.banco_dados = pd.concat([st.session_state.banco_dados, df_novos], ignore_index=True)
-            st.sidebar.warning
+            
             st.sidebar.success("Lançamento adicionado à memória! (Exporta o CSV para guardar na Planilha)")
             st.session_state.primeiro_acesso = False
             st.rerun()
