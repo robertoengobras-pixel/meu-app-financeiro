@@ -292,8 +292,10 @@ with aba_mensal:
         st.plotly_chart(fig, use_container_width=True)
 
 with aba_anual:
-    # --- BLOCO ANUAL (EXCLUSIVO) ---
+    # --- 1. RESUMO ANUAL (Fluxo) ---
     st.subheader("📅 Resumo Anual (Fluxo Mês a Mês)")
+    
+    # Limpeza e preparação dos dados
     df_atual = st.session_state.banco_dados.dropna(subset=['Data', 'Valor']).copy()
     df_atual['Ano_Mes'] = pd.to_datetime(df_atual['Data']).dt.strftime('%Y-%m')
     
@@ -301,13 +303,43 @@ with aba_anual:
         resumo_anual = df_atual.groupby(['Ano_Mes', 'Tipo'])['Valor'].sum().unstack().fillna(0)
         if 'Receita' not in resumo_anual.columns: resumo_anual['Receita'] = 0.0
         if 'Despesa' not in resumo_anual.columns: resumo_anual['Despesa'] = 0.0
+        
         resumo_anual['Saldo_no_Mês'] = resumo_anual['Receita'] - resumo_anual['Despesa']
         resumo_anual['Saldo_Acumulado'] = resumo_anual['Saldo_no_Mês'].cumsum()
+        
         st.dataframe(resumo_anual.style.format("{:.2f}€"), use_container_width=True)
-    
+    else:
+        st.info("Nenhum dado disponível para o resumo anual.")
+
     st.markdown("---")
+
+    # --- 2. RESUMO DE PARCELAS ---
     st.subheader("📋 Resumo de Despesas Parceladas")
-    # (Teu código de parcelas aqui)
+    df_parceladas = df_atual[df_atual['Descrição'].str.contains(r'\(\d+/\d+\)')].copy()
+    
+    if not df_parceladas.empty:
+        df_parceladas['Nome_Despesa'] = df_parceladas['Descrição'].str.split(' \(').str[0]
+        resumo_parcelas = df_parceladas.groupby('Nome_Despesa').agg(
+            Valor_Parcela=('Valor', 'first'),
+            Total_Parcelas=('Descrição', 'count'),
+            Parcelas_Pagas=('Status', lambda x: (x == 'Pago').sum()),
+            Parcelas_A_Pagar=('Status', lambda x: (x == 'Pendente').sum()),
+            Fim_do_Contrato=('Data', 'max')
+        ).reset_index()
+        st.dataframe(resumo_parcelas, use_container_width=True)
+    else:
+        st.info("Não existem despesas parceladas registadas.")
+
+    st.markdown("---")
+
+    # --- 3. GRÁFICO ANUAL ---
+    st.subheader("📊 Distribuição Anual de Gastos")
+    df_des_anual = df_atual[df_atual['Tipo'] == 'Despesa']
+    if not df_des_anual.empty:
+        fig = px.pie(df_des_anual, values='Valor', names='Categoria', hole=0.4)
+        st.plotly_chart(fig, use_container_width=True)
+    else:
+        st.info("Sem dados de despesas para o gráfico anual.")
     
 # --- FORA DAS ABAS (Botão de download no fim da página) ---
 st.markdown("---")
