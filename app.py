@@ -45,9 +45,16 @@ CATEGORIAS_RECEITA = [
 # ==============================================================================
 # 📋 BANCO DE DADOS PERSISTENTE
 # ==============================================================================
+conn = st.connection("gsheets", type=GSheetsConnection)
+
+def carregar_dados_da_planilha():
+    try:
+        return conn.read(usecols=[0,1,2,3,4,5,6])
+    except:
+        return pd.DataFrame(columns=["Data", "Descrição", "Tipo", "Valor", "Método", "Categoria", "Status"])
+
 if 'banco_dados' not in st.session_state:
-    st.session_state.banco_dados = pd.DataFrame(columns=["Data", "Descrição", "Tipo", "Valor", "Método", "Categoria", "Status"])
-    st.session_state.primeiro_acesso = True
+    st.session_state.banco_dados = carregar_dados_da_planilha()
 
 # ==============================================================================
 # 🧠 REGRAS DE NEGÓCIO (Trava Exata do Cartão Auchan Meire)
