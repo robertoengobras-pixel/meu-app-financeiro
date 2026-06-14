@@ -3,7 +3,6 @@ import pandas as pd
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
 import plotly.express as px
-from streamlit_gsheets import GSheetsConnection
 
 # Configuração da página para o modo estendido (visual moderno)
 st.set_page_config(layout="wide", page_title="Finanças Meire e Junior")
@@ -45,15 +44,17 @@ CATEGORIAS_RECEITA = [
 # ==============================================================================
 # 📋 BANCO DE DADOS PERSISTENTE
 # ==============================================================================
-conn = st.connection("gsheets", type=GSheetsConnection)
 
-def carregar_dados_da_planilha():
-    try:
-        return conn.read(usecols=[0,1,2,3,4,5,6])
-    except:
-        return pd.DataFrame(columns=["Data", "Descrição", "Tipo", "Valor", "Método", "Categoria", "Status"])
+URL_PLANILHA = "https://docs.google.com/spreadsheets/d/1dusMDuXQC4a2xiotVm5Gm4vKrc22VcBudsgeupB55OY/export?format=csv"
 
 if 'banco_dados' not in st.session_state:
+    try:
+        # Tenta ler o CSV diretamente do Google
+        st.session_state.banco_dados = pd.read_csv(URL_PLANILHA)
+    except:
+        # Se falhar (por exemplo, se não estiver publicada), cria uma tabela vazia
+        st.error("Erro ao ler a planilha. Verifica se a planilha está 'Publicada na Web' como CSV.")
+        st.session_state.banco_dados = pd.DataFrame(columns=["Data", "Descrição", "Tipo", "Valor", "Método", "Categoria", "Status"])
     st.session_state.banco_dados = carregar_dados_da_planilha()
 
 # ==============================================================================
@@ -157,8 +158,8 @@ if st.sidebar.button("Salvar na Planilha", key="btn_salvar_principal"):
             novos_dados = []
             df_novos = pd.DataFrame(novos_dados)
             st.session_state.banco_dados = pd.concat([st.session_state.banco_dados, df_novos], ignore_index=True)
-            conn.update(data=st.session_state.banco_dados)
-            st.sidebar.success("Dados enviados para a planilha!")
+            st.sidebar.warning
+            st.sidebar.success("Lançamento adicionado à memória! (Exporta o CSV para guardar na Planilha)")
             st.session_state.primeiro_acesso = False
             st.rerun()
 
