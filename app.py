@@ -247,17 +247,20 @@ with aba_mensal:
                 c3.write(f"📅 Entrada: {dia_entrada}\n💳 {row['Método']}")
                 with c4:
                     cc1, cc2 = st.columns(2)
+        # --- Bloco corrigido das Receitas ---
         if row['Status'] == 'Pendente':
             if cc1.button("Receber ✅", key=f"pago_rec_{idx}"):
                 st.session_state.banco_dados.at[idx, 'Status'] = 'Pago'
                 st.rerun()
-        else: # Este ELSE pertence ao IF da linha 250
+        else:
             cc1.write("🟢 Recebido")
             
         if cc2.button("Apagar ❌", key=f"del_rec_{idx}"):
             st.session_state.banco_dados = st.session_state.banco_dados.drop(idx)
             st.rerun()
-                    else:
+
+    # O else abaixo agora está fora do loop e correto!
+    else:
         st.info("Nenhuma receita registada para este mês.")
         
     st.markdown("---")
