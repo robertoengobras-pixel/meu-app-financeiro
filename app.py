@@ -156,6 +156,8 @@ if st.sidebar.button("Salvar na Planilha", key="btn_salvar_principal"):
             
             df_novos = pd.DataFrame(novos_dados)
             st.session_state.banco_dados = pd.concat([st.session_state.banco_dados, df_novos], ignore_index=True)
+            conn.update(data=st.session_state.banco_dados)
+            st.sidebar.success("Dados enviados para a planilha!")
             st.session_state.primeiro_acesso = False
             st.rerun()
 
