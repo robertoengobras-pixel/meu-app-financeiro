@@ -296,13 +296,24 @@ else:
 
 with aba_anual:
     st.subheader("📅 Resumo Anual (Fluxo Mês a Mês)")
-    if not st.session_state.banco_dados.empty:
-        resumo_anual = st.session_state.banco_dados.groupby(['Ano_Mes', 'Tipo'])['Valor'].sum().unstack().fillna(0)
+    
+    # GARANTIR QUE USAMOS A VERSÃO MAIS ATUALIZADA E LIMPA DOS DADOS
+    df_atual = st.session_state.banco_dados.copy()
+    
+    if not df_atual.empty:
+        # Agrupar apenas o que está na memória atual
+        resumo_anual = df_atual.groupby(['Ano_Mes', 'Tipo'])['Valor'].sum().unstack().fillna(0)
+        
+        # Garantir que as colunas existem
         if 'Receita' not in resumo_anual.columns: resumo_anual['Receita'] = 0.0
         if 'Despesa' not in resumo_anual.columns: resumo_anual['Despesa'] = 0.0
+        
         resumo_anual['Saldo_no_Mês'] = resumo_anual['Receita'] - resumo_anual['Despesa']
         resumo_anual['Saldo_Acumulado'] = resumo_anual['Saldo_no_Mês'].cumsum()
+        
         st.dataframe(resumo_anual.style.format("{:.2f}€"), use_container_width=True)
+    else:
+        st.info("Nenhum dado disponível para o resumo anual.")
     
     st.markdown("---")
     st.subheader("📋 Resumo de Despesas Parceladas")
