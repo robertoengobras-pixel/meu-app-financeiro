@@ -297,10 +297,13 @@ else:
 with aba_anual:
     st.subheader("📅 Resumo Anual (Fluxo Mês a Mês)")
     
-    # GARANTIR QUE USAMOS A VERSÃO MAIS ATUALIZADA E LIMPA DOS DADOS
-    df_atual = st.session_state.banco_dados.copy()
+    # 1. LIMPEZA E CÓPIA
+    df_atual = st.session_state.banco_dados.dropna(subset=['Data', 'Valor']).copy()
     
+    # 2. FILTRO DE INTEGRIDADE: Garante que só usa dados que tenham Ano_Mes formatado
     if not df_atual.empty:
+        df_atual['Ano_Mes'] = pd.to_datetime(df_atual['Data']).dt.strftime('%Y-%m')
+        
         # Agrupar apenas o que está na memória atual
         resumo_anual = df_atual.groupby(['Ano_Mes', 'Tipo'])['Valor'].sum().unstack().fillna(0)
         
