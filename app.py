@@ -231,6 +231,31 @@ st.markdown("---")
 # ABAS DE CONTROLE
 # ==============================================================================
 aba_mensal, aba_anual = st.tabs(["📅 Controle Mensal", "📊 Resumos Gerais (Anual e Parcelas)"])      
+with aba_mensal:
+    # 1. BLOCO DE RECEITAS (Estava a faltar!)
+    st.subheader("🍏 Receitas / Entradas")
+    df_rec_mes = df_mes[df_mes['Tipo'] == 'Receita'] if not df_mes.empty else pd.DataFrame()
+    if not df_rec_mes.empty:
+        for idx, row in df_rec_mes.iterrows():
+            dia_entrada = datetime.strptime(str(row['Data']), "%Y-%m-%d").strftime("%d/%m")
+            with st.container(border=True):
+                c1, c2, c3, c4 = st.columns([3, 2, 2, 2])
+                c1.write(f"**{row['Descrição']}**\n*{row['Categoria']}*")
+                c2.write(f"Valor: **{row['Valor']:.2f}€**")
+                c3.write(f"📅 Entrada: {dia_entrada}\n💳 {row['Método']}")
+                with c4:
+                    if row['Status'] == 'Pendente':
+                        if st.button("Receber ✅", key=f"pago_rec_{idx}"):
+                            st.session_state.banco_dados.at[idx, 'Status'] = 'Pago'
+                            st.rerun()
+                    else:
+                        st.write("🟢 Recebido")
+                    if st.button("Apagar ❌", key=f"del_rec_{idx}"):
+                        st.session_state.banco_dados = st.session_state.banco_dados.drop(idx)
+                        st.rerun()
+    else:
+        st.info("Nenhuma receita registada para este mês.")
+        
 st.markdown("---")
 
 st.subheader("🛑 Despesas / Contas a Pagar")
