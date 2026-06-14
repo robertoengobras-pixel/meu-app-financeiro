@@ -42,15 +42,17 @@ CATEGORIAS_RECEITA = [
 ]
 
 # ==============================================================================
-# 📋 BANCO DE DADOS PERSISTENTE
+# 📋 BANCO DE DADOS (Leitura Direta via CSV)
 # ==============================================================================
 
 URL_PLANILHA = "https://docs.google.com/spreadsheets/d/1dusMDuXQC4a2xiotVm5Gm4vKrc22VcBudsgeupB55OY/export?format=csv"
 
 if 'banco_dados' not in st.session_state:
     try:
+        # Tenta ler o CSV diretamente do Google
         st.session_state.banco_dados = pd.read_csv(URL_PLANILHA)
     except:
+        # Se falhar, cria uma tabela vazia para não travar o App
         st.error("Erro ao ler a planilha. Verifica se a planilha está 'Publicada na Web' como CSV.")
         st.session_state.banco_dados = pd.DataFrame(columns=["Data", "Descrição", "Tipo", "Valor", "Método", "Categoria", "Status"])
 
@@ -319,3 +321,15 @@ with aba_anual:
             Fim_do_Contrato=('Data', 'max')
         ).reset_index()
         st.dataframe(resumo_parcelas, use_container_width=True)
+
+st.markdown("---")
+csv = st.session_state.banco_dados.to_csv(index=False).encode('utf-8')
+st.download_button(
+    label="📥 Descarregar dados atualizados (CSV)",
+    data=csv,
+    file_name='financas_meire_junior.csv',
+    mime='text/csv',
+)
+
+        
+
