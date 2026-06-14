@@ -49,13 +49,10 @@ URL_PLANILHA = "https://docs.google.com/spreadsheets/d/1dusMDuXQC4a2xiotVm5Gm4vK
 
 if 'banco_dados' not in st.session_state:
     try:
-        # Tenta ler o CSV diretamente do Google
         st.session_state.banco_dados = pd.read_csv(URL_PLANILHA)
     except:
-        # Se falhar (por exemplo, se não estiver publicada), cria uma tabela vazia
         st.error("Erro ao ler a planilha. Verifica se a planilha está 'Publicada na Web' como CSV.")
         st.session_state.banco_dados = pd.DataFrame(columns=["Data", "Descrição", "Tipo", "Valor", "Método", "Categoria", "Status"])
-    st.session_state.banco_dados = carregar_dados_da_planilha()
 
 # ==============================================================================
 # 🧠 REGRAS DE NEGÓCIO (Trava Exata do Cartão Auchan Meire)
@@ -249,13 +246,13 @@ with aba_mensal:
                     if row['Status'] == 'Pendente':
                         if cc1.button("Receber ✅", key=f"pago_rec_{idx}"):
                             st.session_state.banco_dados.at[idx, 'Status'] = 'Pago'
-                            conn.update(data=st.session_state.banco_dados)
+                            conn.update(data=st.session_state.banco_dados) # DESATIVADO TEMPORARIAMENTE
                             st.rerun()
                     else:
                         cc1.write("🟢 Recebido")
                     if cc2.button("Apagar ❌", key=f"del_rec_{idx}"):
                         st.session_state.banco_dados = st.session_state.banco_dados.drop(idx)
-                        conn.update(data=st.session_state.banco_dados)
+                        conn.update(data=st.session_state.banco_dados) # DESATIVADO TEMPORARIAMENTE
                         st.rerun()
     else:
         st.info("Nenhuma receita registada para este mês.")
@@ -278,13 +275,13 @@ with aba_mensal:
                     if row['Status'] == 'Pendente':
                         if cc1.button("Dar Baixa ✅", key=f"pago_des_{idx}"):
                             st.session_state.banco_dados.at[idx, 'Status'] = 'Pago'
-                            conn.update(data=st.session_state.banco_dados)
+                            conn.update(data=st.session_state.banco_dados) # DESATIVADO TEMPORARIAMENTE
                             st.rerun()
                     else:
                         cc1.write("🟢 Pago")
                     if cc2.button("Apagar ❌", key=f"del_des_{idx}"):
                         st.session_state.banco_dados = st.session_state.banco_dados.drop(idx)
-                        conn.update(data=st.session_state.banco_dados)
+                        conn.update(data=st.session_state.banco_dados) # DESATIVADO TEMPORARIAMENTE
                         st.rerun()
     else:
         st.info("Nenhuma despesa registada para este mês.")
