@@ -234,7 +234,7 @@ aba_mensal, aba_anual = st.tabs(["📅 Controle Mensal", "📊 Resumos Gerais (A
 
 
         
-    st.markdown("---")
+st.markdown("---")
     
     st.subheader("🛑 Despesas / Contas a Pagar")
     df_des_mes = df_mes[df_mes['Tipo'] == 'Despesa'] if not df_mes.empty else pd.DataFrame()
