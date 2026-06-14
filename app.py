@@ -245,11 +245,13 @@ with aba_mensal:
                     if row['Status'] == 'Pendente':
                         if cc1.button("Receber ✅", key=f"pago_rec_{idx}"):
                             st.session_state.banco_dados.at[idx, 'Status'] = 'Pago'
+                            conn.update(data=st.session_state.banco_dados)
                             st.rerun()
                     else:
                         cc1.write("🟢 Recebido")
                     if cc2.button("Apagar ❌", key=f"del_rec_{idx}"):
                         st.session_state.banco_dados = st.session_state.banco_dados.drop(idx)
+                        conn.update(data=st.session_state.banco_dados)
                         st.rerun()
     else:
         st.info("Nenhuma receita registada para este mês.")
@@ -272,11 +274,13 @@ with aba_mensal:
                     if row['Status'] == 'Pendente':
                         if cc1.button("Dar Baixa ✅", key=f"pago_des_{idx}"):
                             st.session_state.banco_dados.at[idx, 'Status'] = 'Pago'
+                            conn.update(data=st.session_state.banco_dados)
                             st.rerun()
                     else:
                         cc1.write("🟢 Pago")
                     if cc2.button("Apagar ❌", key=f"del_des_{idx}"):
                         st.session_state.banco_dados = st.session_state.banco_dados.drop(idx)
+                        conn.update(data=st.session_state.banco_dados)
                         st.rerun()
     else:
         st.info("Nenhuma despesa registada para este mês.")
