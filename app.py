@@ -275,10 +275,13 @@ with aba_mensal:
 
     st.markdown("---")
 
-    # --- BLOCO DE DESPESAS ---
+   # --- BLOCO DE DESPESAS ---
     st.subheader("🛑 Despesas / Contas a Pagar")
     df_des_mes = df_mes[df_mes['Tipo'] == 'Despesa'] if not df_mes.empty else pd.DataFrame()
-    if not df_des_mes.empty:
+
+    if df_des_mes.empty:
+        st.info("Nenhuma despesa registada para este mês.")
+    else:
         for idx, row in df_des_mes.iterrows():
             dia_vencimento = datetime.strptime(str(row['Data']), "%Y-%m-%d").strftime("%d/%m")
             with st.container(border=True):
@@ -294,7 +297,6 @@ with aba_mensal:
                             st.rerun()
                     else:
                         cc1.write("🟢 Pago")
-                    # O "Apagar" agora tem a lógica de parcelas inclusiva
                     if cc2.button("Apagar ❌", key=f"del_des_{idx}"):
                         desc_base = row['Descrição'].split(' (')[0]
                         data_referencia = pd.to_datetime(row['Data'])
@@ -305,13 +307,11 @@ with aba_mensal:
                         st.session_state.banco_dados = st.session_state.banco_dados[~mask_remover]
                         st.rerun()
         
-        # Gráfico também precisa de estar dentro do 'if' ou alinhado com o 'for'
+        # O gráfico agora está DENTRO do 'else' das despesas existentes
         st.markdown("---")
         st.subheader("📊 Distribuição de Gastos do Mês")
         fig = px.pie(df_des_mes, values='Valor', names='Categoria', hole=0.4)
         st.plotly_chart(fig, use_container_width=True)
-    else:
-        st.info("Nenhuma despesa registada para este mês.")
 
     # --- BLOCO DE DESPESAS ---
     st.subheader("🛑 Despesas / Contas a Pagar")
