@@ -271,7 +271,7 @@ with aba_mensal:
 
     st.markdown("---")
 
-    # --- BLOCO ÚNICO DE DESPESAS ---
+ # --- BLOCO ÚNICO DE DESPESAS ---
     st.subheader("🛑 Despesas / Contas a Pagar")
     df_des_mes = df_mes[df_mes['Tipo'] == 'Despesa'] if not df_mes.empty else pd.DataFrame()
 
@@ -288,12 +288,15 @@ with aba_mensal:
                 with c4:
                     cc1, cc2 = st.columns(2)
                     if row['Status'] == 'Pendente':
-                        if cc1.button("Dar Baixa ✅", key=f"pago_des_{idx}_{row['Data']}"
+                        # CORRIGIDO: Fechei o parêntese do botão Dar Baixa
+                        if cc1.button("Dar Baixa ✅", key=f"pago_des_{idx}_{row['Data']}"):
                             st.session_state.banco_dados.at[idx, 'Status'] = 'Pago'
                             st.rerun()
                     else:
                         cc1.write("🟢 Pago")
-                    if cc2.button("Apagar ❌", key=f"del_des_{idx}_{row['Data']}"
+                    
+                    # CORRIGIDO: Fechei o parêntese do botão Apagar
+                    if cc2.button("Apagar ❌", key=f"del_des_{idx}_{row['Data']}"):
                         desc_base = row['Descrição'].split(' (')[0]
                         data_referencia = pd.to_datetime(row['Data'])
                         mask_remover = (
@@ -303,12 +306,11 @@ with aba_mensal:
                         st.session_state.banco_dados = st.session_state.banco_dados[~mask_remover]
                         st.rerun()
 
-        # Gráfico (agora único e dentro do fluxo correto)
+        # Gráfico incluído corretamente no fluxo
         st.markdown("---")
         st.subheader("📊 Distribuição de Gastos do Mês")
         fig = px.pie(df_des_mes, values='Valor', names='Categoria', hole=0.4)
         st.plotly_chart(fig, use_container_width=True)
-
 with aba_anual:
     # --- 1. RESUMO ANUAL (Fluxo) ---
     st.subheader("📅 Resumo Anual (Fluxo Mês a Mês)")
