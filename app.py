@@ -4,14 +4,6 @@ from datetime import datetime
 from dateutil.relativedelta import relativedelta
 import plotly.express as px
 
-# BOTÃO DE SEGURANÇA - Adiciona isto antes de qualquer outra coisa
-if st.sidebar.button("⚠️ REINICIAR DADOS DO GOOGLE"):
-    # Limpa a memória
-    st.session_state.clear()
-    # Força a leitura da planilha do zero
-    st.session_state.banco_dados = pd.read_csv(URL_PLANILHA)
-    st.rerun()
-
 # Configuração da página para o modo estendido (visual moderno)
 st.set_page_config(layout="wide", page_title="Finanças Meire e Junior")
 
