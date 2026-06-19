@@ -145,6 +145,12 @@ if st.sidebar.button("Salvar na Planilha", key="btn_salvar_principal"):
             data_atual = nova_data
             for i in range(1, novas_parcelas + 1):
                 desc_final = f"{nova_desc} ({i}/{novas_parcelas})" if novas_parcelas > 1 else nova_desc
+                else:
+            lista_lancamentos = []
+            data_atual = nova_data
+            
+            for i in range(1, novas_parcelas + 1):
+                desc_final = f"{nova_desc} ({i}/{novas_parcelas})" if novas_parcelas > 1 else nova_desc
                 lista_lancamentos.append({
                     "Data": data_atual.strftime("%Y-%m-%d"),
                     "Descrição": desc_final,
@@ -154,7 +160,12 @@ if st.sidebar.button("Salvar na Planilha", key="btn_salvar_principal"):
                     "Categoria": nova_cat,
                     "Status": "Pendente"
                 })
-                data_atual += relativedelta(months=1)
+                
+                # AQUI ESTÁ A LÓGICA DO TRIMESTRAL
+                if tipo_periodo == "Mensal":
+                    data_atual += relativedelta(months=1)
+                else: # Trimestral
+                    data_atual += relativedelta(months=3)
 
             # Criar DataFrame com a lista correta
             df_novos = pd.DataFrame(lista_lancamentos)
