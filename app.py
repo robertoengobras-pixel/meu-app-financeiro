@@ -135,20 +135,17 @@ if st.sidebar.button("Salvar na Planilha", key="btn_salvar_principal"):
     else:
         valido = True
         msg_erro = ""
+        # Validação do cartão Auchan (mantém-se igual)
         if novo_tipo == "Despesa" and str(novo_metodo).strip() == "Cartão Auchan Meire":
             valido, msg_erro = validar_teto_cartao_auchan(novo_valor, sub_despesa, mes_alvo_cadastro)
             
         if not valido:
             st.sidebar.error(msg_erro)
         else:
-            lista_lancamentos = [] # Usamos um nome novo para evitar confusões
-            data_atual = nova_data
-            for i in range(1, novas_parcelas + 1):
-                desc_final = f"{nova_desc} ({i}/{novas_parcelas})" if novas_parcelas > 1 else nova_desc
-                else:
             lista_lancamentos = []
             data_atual = nova_data
             
+            # AGORA O LOOP USA A VARIÁVEL QUE DEFINIMOS NA BARRA LATERAL
             for i in range(1, novas_parcelas + 1):
                 desc_final = f"{nova_desc} ({i}/{novas_parcelas})" if novas_parcelas > 1 else nova_desc
                 lista_lancamentos.append({
@@ -161,11 +158,16 @@ if st.sidebar.button("Salvar na Planilha", key="btn_salvar_principal"):
                     "Status": "Pendente"
                 })
                 
-                # AQUI ESTÁ A LÓGICA DO TRIMESTRAL
-                if tipo_periodo == "Mensal":
-                    data_atual += relativedelta(months=1)
-                else: # Trimestral
+                # A lógica agora está segura:
+                if tipo_periodo == "Trimestral":
                     data_atual += relativedelta(months=3)
+                else:
+                    data_atual += relativedelta(months=1)
+
+            # Concatenar
+            st.session_state.banco_dados = pd.concat([st.session_state.banco_dados, pd.DataFrame(lista_lancamentos)], ignore_index=True)
+            st.sidebar.success("Lançamento adicionado!")
+            st.rerun()
 
             # Criar DataFrame com a lista correta
             df_novos = pd.DataFrame(lista_lancamentos)
