@@ -141,23 +141,11 @@ if st.sidebar.button("Salvar na Planilha", key="btn_salvar_principal"):
             
         if not valido:
             st.sidebar.error(msg_erro)
-        else:
+       else:
             lista_lancamentos = []
             data_atual = nova_data
             
-            for i in range(1, novas_parcelas + 1):
-                desc_final = f"{nova_desc} ({i}/{novas_parcelas})" if novas_parcelas > 1 else nova_desc
-                lista_lancamentos.append({
-                    "Data": data_atual.strftime("%Y-%m-%d"),
-                    "Descrição": desc_final,
-                    "Tipo": novo_tipo,
-                    "Valor": float(novo_valor),
-                    "Método": novo_metodo,
-                    "Categoria": nova_cat,
-                    "Status": "Pendente"
-                })
-            
-            # AGORA O LOOP USA A VARIÁVEL QUE DEFINIMOS NA BARRA LATERAL
+            # --- APENAS UM ÚNICO LOOP ---
             for i in range(1, novas_parcelas + 1):
                 desc_final = f"{nova_desc} ({i}/{novas_parcelas})" if novas_parcelas > 1 else nova_desc
                 lista_lancamentos.append({
@@ -170,24 +158,17 @@ if st.sidebar.button("Salvar na Planilha", key="btn_salvar_principal"):
                     "Status": "Pendente"
                 })
                 
-                # A LÓGICA QUE VAI FAZER O SALTO TRIMESTRAL OU MENSAL
+                # Atualiza a data para a próxima parcela
                 if tipo_periodo == "Trimestral":
                     data_atual += relativedelta(months=3)
                 else:
                     data_atual += relativedelta(months=1)
 
-            # Concatenar
-            st.session_state.banco_dados = pd.concat([st.session_state.banco_dados, pd.DataFrame(lista_lancamentos)], ignore_index=True)
-            st.sidebar.success("Lançamento adicionado!")
-            st.rerun()
-
-            # Criar DataFrame com a lista correta
+            # --- CONCATENAÇÃO ÚNICA E SEGURA ---
             df_novos = pd.DataFrame(lista_lancamentos)
-            
-            # Concatenar com os dados existentes
             st.session_state.banco_dados = pd.concat([st.session_state.banco_dados, df_novos], ignore_index=True)
-            st.sidebar.success("Lançamento adicionado à memória! (Exporta o CSV para guardar na Planilha)")
-            st.session_state.primeiro_acesso = False
+            
+            st.sidebar.success("Lançamento adicionado!")
             st.rerun()
 
 # ==============================================================================
