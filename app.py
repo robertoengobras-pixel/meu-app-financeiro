@@ -241,7 +241,7 @@ st.markdown("---")
 aba_mensal, aba_anual = st.tabs(["📅 Controle Mensal", "📊 Resumos Gerais (Anual e Parcelas)"])
 
 with aba_mensal:
-    # --- BLOCO DE RECEITAS ---
+  # --- BLOCO DE RECEITAS (CORRIGIDO) ---
     st.subheader("🍏 Receitas / Entradas")
     df_rec_mes = df_mes[df_mes['Tipo'] == 'Receita'] if not df_mes.empty else pd.DataFrame()
     if not df_rec_mes.empty:
@@ -255,12 +255,15 @@ with aba_mensal:
                 with c4:
                     cc1, cc2 = st.columns(2)
                     if row['Status'] == 'Pendente':
-                        if cc1.button("Receber ✅", key=f"pago_rec_{idx}"):
+                        # Botão Receber com key única
+                        if cc1.button("Receber ✅", key=f"pago_rec_{idx}_{row['Data']}"):
                             st.session_state.banco_dados.at[idx, 'Status'] = 'Pago'
                             st.rerun()
                     else:
                         cc1.write("🟢 Recebido")
-                    if cc2.button("Apagar ❌", key=f"del_rec_{idx}"):
+                    
+                    # Botão Apagar com key única (Diferente da anterior)
+                    if cc2.button("Apagar ❌", key=f"del_rec_{idx}_{row['Data']}"):
                         st.session_state.banco_dados = st.session_state.banco_dados.drop(idx)
                         st.rerun()
     else:
@@ -285,12 +288,12 @@ with aba_mensal:
                 with c4:
                     cc1, cc2 = st.columns(2)
                     if row['Status'] == 'Pendente':
-                        if cc1.button("Dar Baixa ✅", key=f"pago_des_{idx}"):
+                        if cc1.button("Dar Baixa ✅", key=f"pago_des_{idx}_{row['Data']}"
                             st.session_state.banco_dados.at[idx, 'Status'] = 'Pago'
                             st.rerun()
                     else:
                         cc1.write("🟢 Pago")
-                    if cc2.button("Apagar ❌", key=f"del_des_{idx}"):
+                    if cc2.button("Apagar ❌", key=f"del_des_{idx}_{row['Data']}"
                         desc_base = row['Descrição'].split(' (')[0]
                         data_referencia = pd.to_datetime(row['Data'])
                         mask_remover = (
