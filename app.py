@@ -29,6 +29,7 @@ CATEGORIAS_DESPESA = [
     "Família/Filhos (Creche, Explicações, ATL)",
     "Saúde & Seguros",
     "Créditos/Financiamentos",
+    "PETS",
     "Outros/Diversos"
 ]
 
