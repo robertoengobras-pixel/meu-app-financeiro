@@ -287,45 +287,7 @@ with aba_mensal:
 
     st.markdown("---")
 
-   # --- BLOCO DE DESPESAS ---
-    st.subheader("🛑 Despesas / Contas a Pagar")
-    df_des_mes = df_mes[df_mes['Tipo'] == 'Despesa'] if not df_mes.empty else pd.DataFrame()
-
-    if df_des_mes.empty:
-        st.info("Nenhuma despesa registada para este mês.")
-    else:
-        for idx, row in df_des_mes.iterrows():
-            dia_vencimento = datetime.strptime(str(row['Data']), "%Y-%m-%d").strftime("%d/%m")
-            with st.container(border=True):
-                c1, c2, c3, c4 = st.columns([3, 2, 2, 2])
-                c1.write(f"**{row['Descrição']}**\n*{row['Categoria']}*")
-                c2.write(f"Valor: **{row['Valor']:.2f}€**")
-                c3.write(f"📅 Vencimento: {dia_vencimento}\n💳 {row['Método']}")
-                with c4:
-                    cc1, cc2 = st.columns(2)
-                    if row['Status'] == 'Pendente':
-                        if cc1.button("Dar Baixa ✅", key=f"pago_des_{idx}"):
-                            st.session_state.banco_dados.at[idx, 'Status'] = 'Pago'
-                            st.rerun()
-                    else:
-                        cc1.write("🟢 Pago")
-                    if cc2.button("Apagar ❌", key=f"del_des_{idx}"):
-                        desc_base = row['Descrição'].split(' (')[0]
-                        data_referencia = pd.to_datetime(row['Data'])
-                        mask_remover = (
-                            (st.session_state.banco_dados['Descrição'].str.contains(desc_base)) & 
-                            (pd.to_datetime(st.session_state.banco_dados['Data']) >= data_referencia)
-                        )
-                        st.session_state.banco_dados = st.session_state.banco_dados[~mask_remover]
-                        st.rerun()
-        
-        # O gráfico agora está DENTRO do 'else' das despesas existentes
-        st.markdown("---")
-        st.subheader("📊 Distribuição de Gastos do Mês")
-        fig = px.pie(df_des_mes, values='Valor', names='Categoria', hole=0.4)
-        st.plotly_chart(fig, use_container_width=True)
-
-    # --- BLOCO DE DESPESAS ---
+    # --- BLOCO ÚNICO DE DESPESAS ---
     st.subheader("🛑 Despesas / Contas a Pagar")
     df_des_mes = df_mes[df_mes['Tipo'] == 'Despesa'] if not df_mes.empty else pd.DataFrame()
 
@@ -357,8 +319,7 @@ with aba_mensal:
                         st.session_state.banco_dados = st.session_state.banco_dados[~mask_remover]
                         st.rerun()
 
-    # --- GRÁFICO (FORA DO IF/ELSE PARA EVITAR ERROS) ---
-    if not df_des_mes.empty:
+        # Gráfico (agora único e dentro do fluxo correto)
         st.markdown("---")
         st.subheader("📊 Distribuição de Gastos do Mês")
         fig = px.pie(df_des_mes, values='Valor', names='Categoria', hole=0.4)
