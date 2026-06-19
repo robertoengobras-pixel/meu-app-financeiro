@@ -141,7 +141,7 @@ if st.sidebar.button("Salvar na Planilha", key="btn_salvar_principal"):
             
         if not valido:
             st.sidebar.error(msg_erro)
-       else:
+    else:
             lista_lancamentos = []
             data_atual = nova_data
             
