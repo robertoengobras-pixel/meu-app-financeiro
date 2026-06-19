@@ -102,7 +102,17 @@ def validar_teto_cartao_auchan(novo_valor, subdespesa, mes_alvo):
 # ==============================================================================
 st.sidebar.header("➕ Novo Lançamento")
 
-nova_data = st.sidebar.date_input("Data de Vencimento / Entrada", datetime.now())
+# --- Na Barra Lateral ---
+if 'data_selecionada' not in st.session_state:
+    st.session_state.data_selecionada = datetime.now()
+
+nova_data = st.sidebar.date_input(
+    "Data de Vencimento / Entrada", 
+    value=st.session_state.data_selecionada,
+    key="sb_data"
+)
+# Atualiza o session_state com a escolha do utilizador
+st.session_state.data_selecionada = nova_data
 novo_tipo = st.sidebar.selectbox("Tipo de Fluxo", ["Despesa", "Receita"], key="sb_tipo")
 
 sub_despesa = ""
