@@ -145,6 +145,18 @@ if st.sidebar.button("Salvar na Planilha", key="btn_salvar_principal"):
             lista_lancamentos = []
             data_atual = nova_data
             
+            for i in range(1, novas_parcelas + 1):
+                desc_final = f"{nova_desc} ({i}/{novas_parcelas})" if novas_parcelas > 1 else nova_desc
+                lista_lancamentos.append({
+                    "Data": data_atual.strftime("%Y-%m-%d"),
+                    "Descrição": desc_final,
+                    "Tipo": novo_tipo,
+                    "Valor": float(novo_valor),
+                    "Método": novo_metodo,
+                    "Categoria": nova_cat,
+                    "Status": "Pendente"
+                })
+            
             # AGORA O LOOP USA A VARIÁVEL QUE DEFINIMOS NA BARRA LATERAL
             for i in range(1, novas_parcelas + 1):
                 desc_final = f"{nova_desc} ({i}/{novas_parcelas})" if novas_parcelas > 1 else nova_desc
@@ -158,7 +170,7 @@ if st.sidebar.button("Salvar na Planilha", key="btn_salvar_principal"):
                     "Status": "Pendente"
                 })
                 
-                # A lógica agora está segura:
+                # A LÓGICA QUE VAI FAZER O SALTO TRIMESTRAL OU MENSAL
                 if tipo_periodo == "Trimestral":
                     data_atual += relativedelta(months=3)
                 else:
