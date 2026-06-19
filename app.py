@@ -122,7 +122,8 @@ else:
     nova_desc = f"{nome_cat_limpo}{detalhe} ({novo_metodo})"
     
 novo_valor = st.sidebar.number_input("Valor (€)", min_value=0.0, step=5.0, key="sb_valor")
-novas_parcelas = st.sidebar.number_input("Quantidade de Parcelas", min_value=1, max_value=12, value=1, key="sb_parcelas")
+novas_parcelas = st.sidebar.number_input("Quantidade de Parcelas", min_value=1, max_value=120, value=1, key="sb_parcelas")
+tipo_periodo = st.sidebar.selectbox("Periodicidade", ["Mensal", "Trimestral"], key="sb_periodo")
 
 if st.sidebar.button("Salvar na Planilha", key="btn_salvar_principal"):
     mes_alvo_cadastro = nova_data.strftime('%Y-%m')
