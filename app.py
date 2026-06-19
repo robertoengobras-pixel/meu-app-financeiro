@@ -143,31 +143,43 @@ if st.sidebar.button("Salvar na Planilha", key="btn_salvar_principal"):
     elif novo_tipo == "Despesa" and not sub_despesa:
         st.sidebar.warning("⚠️ Por favor, preencha o campo informando o que é a despesa!")
     else:
-        valido = True
-        msg_erro = ""
-        # Validação do cartão Auchan (mantém-se igual)
-        if novo_tipo == "Despesa" and str(novo_metodo).strip() == "Cartão Auchan Meire":
-            valido, msg_erro = validar_teto_cartao_auchan(novo_valor, sub_despesa, mes_alvo_cadastro)
+            # 1. Validação do cartão (mantém-se)
+            valido = True
+            msg_erro = ""
+            if novo_tipo == "Despesa" and str(novo_metodo).strip() == "Cartão Auchan Meire":
+                valido, msg_erro = validar_teto_cartao_auchan(novo_valor, sub_despesa, mes_alvo_cadastro)
             
-        if not valido:
-            st.sidebar.error(msg_erro)
-        else:
-            # Garante que este 'else' começa exatamente no mesmo nível do 'if' acima
-            lista_lancamentos = []
-            data_atual = nova_data
-            
-            # --- APENAS UM ÚNICO LOOP ---
-            for i in range(1, novas_parcelas + 1):
-                desc_final = f"{nova_desc} ({i}/{novas_parcelas})" if novas_parcelas > 1 else nova_desc
-                lista_lancamentos.append({
-                    "Data": data_atual.strftime("%Y-%m-%d"),
-                    "Descrição": desc_final,
-                    "Tipo": novo_tipo,
-                    "Valor": float(novo_valor),
-                    "Método": novo_metodo,
-                    "Categoria": nova_cat,
-                    "Status": "Pendente"
-                })
+            if not valido:
+                st.sidebar.error(msg_erro)
+            else:
+                # 2. Criação das parcelas
+                lista_lancamentos = []
+                data_atual = nova_data
+                
+                for i in range(1, novas_parcelas + 1):
+                    desc_final = f"{nova_desc} ({i}/{novas_parcelas})" if novas_parcelas > 1 else nova_desc
+                    lista_lancamentos.append({
+                        "Data": data_atual.strftime("%Y-%m-%d"),
+                        "Descrição": desc_final,
+                        "Tipo": novo_tipo,
+                        "Valor": float(novo_valor),
+                        "Método": novo_metodo,
+                        "Categoria": nova_cat,
+                        "Status": "Pendente"
+                    })
+                    
+                    # Salto de data correto
+                    if tipo_periodo == "Trimestral":
+                        data_atual += relativedelta(months=3)
+                    else:
+                        data_atual += relativedelta(months=1)
+
+                # 3. Guardar no banco de dados
+                df_novos = pd.DataFrame(lista_lancamentos)
+                st.session_state.banco_dados = pd.concat([st.session_state.banco_dados, df_novos], ignore_index=True)
+                
+                st.sidebar.success("Lançamento adicionado!")
+                st.rerun()
                 
                 # Atualiza a data para a próxima parcela
                 if tipo_periodo == "Trimestral":
