@@ -282,8 +282,20 @@ with aba_mensal:
                     else:
                         cc1.write("🟢 Pago")
                     if cc2.button("Apagar ❌", key=f"del_des_{idx}"):
-                        st.session_state.banco_dados = st.session_state.banco_dados.drop(idx)
-                        st.rerun()
+    # Identificar a base do nome (ex: "Seguro (1/10)" -> "Seguro")
+    desc_base = row['Descrição'].split(' (')[0]
+    
+    # Apagar apenas se for a mesma despesa E se a data for >= data atual da linha
+    # Convertemos a data da linha atual para comparação
+    data_referencia = pd.to_datetime(row['Data'])
+    
+    # Filtro: Apaga se for a mesma base E data igual ou superior à da linha clicada
+    mask_remover = (
+        (st.session_state.banco_dados['Descrição'].str.contains(desc_base)) & 
+        (pd.to_datetime(st.session_state.banco_dados['Data']) >= data_referencia)
+    )
+    st.session_state.banco_dados = st.session_state.banco_dados[~mask_remover]
+    st.rerun()
     else:
         st.info("Nenhuma despesa registada para este mês.")
 
